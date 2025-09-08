@@ -1,0 +1,21 @@
+# Node.js
+node_modules/
+*.log
+
+# pnpm
+.pnpm-debug.log*
+
+# Common build dirs
+dist/
+build/
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

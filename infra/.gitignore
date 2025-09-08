@@ -1,0 +1,13 @@
+# CDK outputs
+cdk.out/
+cdk.context.json
+
+# Node.js
+node_modules/
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# Env files
+.env
