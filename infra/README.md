@@ -1,22 +1,14 @@
-# 📦 Infra (AWS CDK)
+# Welcome to your CDK TypeScript project
 
-This package contains the **Infrastructure as Code (IaC)** definitions using AWS CDK.
+This is a blank project for CDK development with TypeScript.
 
-## 🌐 Responsibilities
-- S3 + CloudFront → Frontend hosting
-- Cognito → Authentication
-- API Gateway (REST) → Entry point for backend
-- Lambda → Business logic
-- DynamoDB → Task storage
-- Step Functions + SNS → Approvals + Notifications
+The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
-## 🛠 Commands
-```bash
-# Synthesize CloudFormation template
-pnpm cdk synth
+## Useful commands
 
-# Deploy to AWS
-pnpm cdk deploy
-
-# Destroy stack (⚠️ cleanup carefully)
-pnpm cdk destroy
+* `npm run build`   compile typescript to js
+* `npm run watch`   watch for changes and compile
+* `npm run test`    perform the jest unit tests
+* `npx cdk deploy`  deploy this stack to your default AWS account/region
+* `npx cdk diff`    compare deployed stack with current state
+* `npx cdk synth`   emits the synthesized CloudFormation template
