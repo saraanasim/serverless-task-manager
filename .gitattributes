@@ -1,0 +1,35 @@
+# Handle line endings consistently
+* text=auto eol=lf
+
+# Explicitly define file types
+*.sh     text eol=lf
+*.ts     text eol=lf
+*.tsx    text eol=lf
+*.js     text eol=lf
+*.jsx    text eol=lf
+*.json   text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.md     text eol=lf
+*.css    text eol=lf
+*.scss   text eol=lf
+*.html   text eol=lf
+
+# Binary files (don't diff/convert line endings)
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.zip    binary
+
+# GitHub linguist overrides (optional, improves stats)
+infra/* linguist-vendored=false
+backend/* linguist-vendored=false
+frontend/* linguist-vendored=false
+
+# Mark lock files as generated
+pnpm-lock.yaml linguist-generated=true
+package-lock.json linguist-generated=true
+yarn.lock linguist-generated=true
