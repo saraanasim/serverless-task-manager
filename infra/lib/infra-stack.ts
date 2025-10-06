@@ -1,6 +1,9 @@
 import * as cdk from "aws-cdk-lib";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
 export class InfraStack extends cdk.Stack {
@@ -8,15 +11,39 @@ export class InfraStack extends cdk.Stack {
     super(scope, id, props);
 
     const websiteBucket = new s3.Bucket(this, "WebsiteBucket", {
+      websiteIndexDocument: "index.html",
       publicReadAccess: false,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
 
+    const distribution = new cloudfront.Distribution(
+      this,
+      "WebsiteDistribution",
+      {
+        defaultBehavior: {
+          origin: new origins.S3Origin(websiteBucket),
+        },
+        defaultRootObject: "index.html",
+      }
+    );
+
+    new s3deploy.BucketDeployment(this, "DeployWebsite", {
+      sources: [s3deploy.Source.asset("../frontend/dist")],
+      destinationBucket: websiteBucket,
+      distribution,
+      distributionPaths:['/*']
+    });
+
     new cdk.CfnOutput(this, "BucketName", {
       value: websiteBucket.bucketName,
-      description: "The name of the bucket",
+      description: "The name of the bucket which hosts the site",
     });
+
+    new cdk.CfnOutput(this, "CloudFrontURL", {
+      value: distribution.distributionDomainName,
+      description: "The CloudFront distribution domain for the website",
+    });
+    
   }
 }
