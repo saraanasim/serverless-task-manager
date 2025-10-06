@@ -10,19 +10,22 @@ export class InfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    const originAccessIdentity = new cloudfront.OriginAccessIdentity(this, "OriginAccessIdentity");
+
     const websiteBucket = new s3.Bucket(this, "WebsiteBucket", {
-      websiteIndexDocument: "index.html",
       publicReadAccess: false,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
+
+    websiteBucket.grantRead(originAccessIdentity)
 
     const distribution = new cloudfront.Distribution(
       this,
       "WebsiteDistribution",
       {
         defaultBehavior: {
-          origin: new origins.S3Origin(websiteBucket),
+          origin: new origins.S3Origin(websiteBucket,{originAccessIdentity}),
         },
         defaultRootObject: "index.html",
       }
