@@ -439,6 +439,216 @@ aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE
 
 ---
 
+## ✅ Phase 1.5: Infrastructure Structure Refactoring
+
+### **What Was Done**
+
+Refactored the monolithic CDK stack into a modular structure following industry standards and Single Responsibility Principle.
+
+### **Implementation Steps**
+
+#### **1. Created Environment Configuration**
+
+**File Created: `infra/config/environments.ts`**
+
+- **What**: Created centralized configuration for different environments (dev/prod)
+- **Why**: Avoid hardcoding values, easy to deploy to multiple environments
+- **How**: 
+  - Defined `EnvironmentConfig` TypeScript interface
+  - Created `devConfig` with dev settings
+  - Created `prodConfig` with prod settings
+- **Contains**:
+  - Region configuration
+  - Frontend build path
+  - Naming conventions (prefix + suffix)
+  - Resource tags
+
+#### **2. Created S3 Bucket Construct**
+
+**File Created: `infra/lib/constructs/s3-bucket-construct.ts`**
+
+- **What**: Reusable construct that creates S3 buckets
+- **Why**: Can be reused for website hosting, file storage, logs, etc.
+- **How**: Single-purpose class that only handles S3 bucket creation
+- **Free tier optimizations**:
+  - `versioned: false` - No versioning to avoid extra storage costs
+  - `encryption: S3_MANAGED` - Free SSE-S3 encryption
+  - `removalPolicy: DESTROY` - Easy cleanup
+  - `autoDeleteObjects: true` - Automatic cleanup on destroy
+
+#### **3. Created CloudFront Distribution Construct**
+
+**File Created: `infra/lib/constructs/cloudfront-distribution-construct.ts`**
+
+- **What**: Reusable construct that creates CloudFront distributions
+- **Why**: Can be reused with different origins (S3, ALB, custom origins)
+- **How**: Single-purpose class that handles CloudFront + OAI setup
+- **Free tier optimizations**:
+  - `priceClass: PRICE_CLASS_100` - Uses only US, Canada, Europe (cheapest option)
+  - `cachePolicy: CACHING_OPTIMIZED` - Reduces origin requests
+  - Includes Origin Access Identity (OAI) creation and configuration
+
+#### **4. Created S3 Deployment Construct**
+
+**File Created: `infra/lib/constructs/s3-deployment-construct.ts`**
+
+- **What**: Reusable construct that deploys files to S3
+- **Why**: Can be reused to deploy any files to any bucket
+- **How**: Single-purpose class that handles file deployment and CloudFront invalidation
+- **Free tier note**: First 1,000 CloudFront invalidation paths/month are free
+
+#### **5. Created Frontend Stack**
+
+**File Created: `infra/lib/stacks/frontend-stack.ts`**
+
+- **What**: Stack that composes the three constructs above
+- **Why**: Separation of concerns - stack orchestrates, constructs implement
+- **How**: 
+  1. Creates S3 bucket using `S3BucketConstruct`
+  2. Creates CloudFront distribution using `CloudFrontDistributionConstruct`
+  3. Deploys files using `S3DeploymentConstruct`
+- **Benefits**:
+  - Environment-aware (uses config)
+  - Properly tagged
+  - Clean outputs
+  - Exports for other stacks
+
+#### **6. Updated App Entry Point**
+
+**File Updated: `infra/bin/infra.ts`**
+
+- **What**: Updated to use new `FrontendStack` instead of monolithic `InfraStack`
+- **Why**: Clean separation between app orchestration and stack implementation
+- **How**:
+  - Imports environment config
+  - Selects dev/prod based on context
+  - Creates stack with appropriate naming
+- **Stack naming**: `TaskApproval-Frontend-Dev` (follows naming convention)
+
+#### **7. Backed Up Old Stack**
+
+**File Renamed: `infra/lib/infra-stack.ts` → `infra/lib/infra-stack.ts.backup`**
+
+- **What**: Kept old monolithic stack as reference
+- **Why**: Prevents conflicts, allows rollback if needed
+
+### **Key Concepts Learned**
+
+#### **Single Responsibility Principle**
+- Each construct does ONE thing:
+  - `S3BucketConstruct` → Creates S3 bucket
+  - `CloudFrontDistributionConstruct` → Creates CloudFront + OAI
+  - `S3DeploymentConstruct` → Deploys files
+- **Benefits**: Easier to understand, test, reuse, and maintain
+
+#### **Composition Over Inheritance**
+- Stack composes multiple focused constructs
+- Constructs can be mixed and matched
+- No tight coupling between components
+
+#### **Configuration Management**
+- Centralized environment settings
+- Type-safe configuration (TypeScript interfaces)
+- Easy to add new environments (staging, qa, etc.)
+
+#### **Construct Library Pattern**
+- Reusable building blocks
+- Consistent configuration across uses
+- Industry-standard CDK organization
+
+### **Architecture Comparison**
+
+**Before (Monolithic):**
+```
+infra-stack.ts (one big file)
+└── All S3, CloudFront, deployment logic mixed together
+```
+
+**After (Modular):**
+```
+config/environments.ts (configuration)
+lib/constructs/ (reusable building blocks)
+  ├── s3-bucket-construct.ts
+  ├── cloudfront-distribution-construct.ts
+  └── s3-deployment-construct.ts
+lib/stacks/ (deployment units)
+  └── frontend-stack.ts (composes constructs)
+bin/infra.ts (app orchestration)
+```
+
+### **Verification Steps**
+
+#### **✅ No Infrastructure Changes**
+
+This was a refactoring, so infrastructure should be identical:
+
+```bash
+cd infra
+cdk diff
+```
+
+**Expected**: No changes or only cosmetic differences (stack names, comments)
+
+#### **✅ Build Succeeds**
+
+```bash
+cd infra
+pnpm build
+```
+
+**Expected**: TypeScript compiles without errors
+
+#### **✅ Deployment Works**
+
+```bash
+cd infra
+cdk deploy
+```
+
+**Expected**:
+- Stack name changes to `TaskApproval-Frontend-Dev`
+- All resources remain functionally the same
+- Website continues to work
+
+#### **✅ Website Still Works**
+
+```bash
+cdk outputs
+# Test CloudFront URL in browser
+```
+
+**Expected**: React app loads correctly (same as before refactoring)
+
+### **Free Tier Impact**
+
+✅ **Phase 1.5 has NO additional costs**
+
+- Refactoring is code organization only
+- Same AWS resources as Phase 1
+- Same S3 and CloudFront usage
+- **Cost**: $0 (same as Phase 1)
+
+### **Benefits Achieved**
+
+1. **Better Organization**: Clear file structure with single-purpose files
+2. **Reusability**: Constructs can be used in future phases
+3. **Maintainability**: Changes are localized to specific constructs
+4. **Scalability**: Easy to add new constructs and stacks
+5. **Industry Standard**: Follows AWS CDK best practices
+
+### **Cleanup**
+
+Same as Phase 1:
+
+```bash
+cd infra
+cdk destroy
+```
+
+All resources deleted regardless of structure (monolithic or modular).
+
+---
+
 ## ⏳ Phase 2: Authentication (Cognito)
 
 ### **Implementation Steps**

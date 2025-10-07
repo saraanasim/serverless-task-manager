@@ -59,18 +59,22 @@ Each phase corresponds to an AWS service integration. Check off as you complete 
 
 ### **Phase 1.5: Infrastructure Structure Refactoring**
 - [ ] Create `config/environments.ts` for environment management
-- [ ] Create `lib/constructs/frontend-hosting-construct.ts` for reusable S3+CloudFront logic
-- [ ] Create `lib/stacks/frontend-stack.ts` for frontend deployment unit
+- [ ] Create `lib/constructs/s3-bucket-construct.ts` for reusable S3 bucket
+- [ ] Create `lib/constructs/cloudfront-distribution-construct.ts` for reusable CloudFront
+- [ ] Create `lib/constructs/s3-deployment-construct.ts` for reusable S3 deployment
+- [ ] Create `lib/stacks/frontend-stack.ts` for frontend deployment unit (uses above constructs)
 - [ ] Update `bin/infra.ts` to use new structure
 - [ ] Backup old `lib/infra-stack.ts` as `.backup`
 - [ ] Deploy and verify new structure works
-- [ ] **LEARNING**: Understand stacks vs constructs, configuration management
+- [ ] **LEARNING**: Single Responsibility Principle, stacks vs constructs, configuration management
 
 ---
 
 ## ⏳ Phase 2: Authentication (Cognito)
-- [ ] Create `lib/constructs/auth-construct.ts` for reusable Cognito logic
-- [ ] Create `lib/stacks/auth-stack.ts` for authentication deployment unit
+- [ ] Create `lib/constructs/user-pool-construct.ts` for reusable Cognito User Pool
+- [ ] Create `lib/constructs/identity-pool-construct.ts` for reusable Cognito Identity Pool
+- [ ] Create `lib/constructs/iam-role-construct.ts` for reusable IAM roles
+- [ ] Create `lib/stacks/auth-stack.ts` for authentication deployment unit (uses above constructs)
 - [ ] Create Cognito User Pool with proper configuration
 - [ ] Create Cognito Identity Pool for AWS resource access
 - [ ] Setup IAM roles for authenticated users
@@ -78,14 +82,17 @@ Each phase corresponds to an AWS service integration. Check off as you complete 
 - [ ] Add role-based access (Admin/User groups)
 - [ ] Update `bin/infra.ts` to include auth stack
 - [ ] **COST CHECK**: Cognito 50K MAU free tier ✅
-- [ ] **LEARNING**: User Pools vs Identity Pools, JWT tokens, IAM roles
+- [ ] **LEARNING**: User Pools vs Identity Pools, JWT tokens, IAM roles, federated identity
 
 ---
 
 ## ⏳ Phase 3: REST API (API Gateway + Lambda)
-- [ ] Create `lib/constructs/lambda-construct.ts` for standardized Lambda functions
-- [ ] Create `lib/constructs/api-construct.ts` for standardized API Gateway
-- [ ] Create `lib/stacks/api-stack.ts` for API deployment unit
+- [ ] Create `lib/constructs/lambda-function-construct.ts` for reusable Lambda functions
+- [ ] Create `lib/constructs/lambda-layer-construct.ts` for reusable Lambda layers
+- [ ] Create `lib/constructs/sqs-queue-construct.ts` for reusable SQS queues (DLQ)
+- [ ] Create `lib/constructs/api-gateway-construct.ts` for reusable REST API
+- [ ] Create `lib/constructs/api-authorizer-construct.ts` for reusable Cognito authorizer
+- [ ] Create `lib/stacks/api-stack.ts` for API deployment unit (uses above constructs)
 - [ ] Create Lambda functions for task operations (CRUD)
 - [ ] Create API Gateway REST API with proper configuration
 - [ ] Define endpoints (POST/GET/PUT/DELETE tasks)
@@ -96,14 +103,16 @@ Each phase corresponds to an AWS service integration. Check off as you complete 
 - [ ] Secure with Cognito Authorizer
 - [ ] Update `bin/infra.ts` to include API stack with dependencies
 - [ ] **COST CHECK**: API Gateway 1M calls + Lambda 1M requests free tier ✅
-- [ ] **LEARNING**: API Gateway integration, Lambda configuration, request/response mapping
+- [ ] **LEARNING**: Lambda patterns, API Gateway integration, request/response mapping, DLQ strategy
 
 ---
 
 ## ⏳ Phase 4: Data Storage (DynamoDB + S3)
-- [ ] Create `lib/constructs/database-construct.ts` for standardized DynamoDB tables
-- [ ] Create `lib/constructs/storage-construct.ts` for standardized S3 buckets
-- [ ] Create `lib/stacks/storage-stack.ts` for storage deployment unit
+- [ ] Create `lib/constructs/dynamodb-table-construct.ts` for reusable DynamoDB tables
+- [ ] Create `lib/constructs/dynamodb-gsi-construct.ts` for reusable Global Secondary Indexes
+- [ ] Create `lib/constructs/dynamodb-stream-construct.ts` for reusable DynamoDB Streams
+- [ ] Create `lib/constructs/s3-bucket-construct.ts` for reusable S3 buckets (file storage)
+- [ ] Create `lib/stacks/storage-stack.ts` for storage deployment unit (uses above constructs)
 - [ ] Create DynamoDB table for tasks (on-demand billing)
 - [ ] Add Global Secondary Index (GSI)
 - [ ] Add Local Secondary Index (LSI)
@@ -114,13 +123,14 @@ Each phase corresponds to an AWS service integration. Check off as you complete 
 - [ ] File uploads from React
 - [ ] Update `bin/infra.ts` to include storage stack with dependencies
 - [ ] **COST CHECK**: DynamoDB 25GB + S3 5GB free tier ✅
-- [ ] **LEARNING**: DynamoDB design patterns, GSI/LSI, S3 pre-signed URLs
+- [ ] **LEARNING**: DynamoDB single-table design, GSI/LSI patterns, S3 pre-signed URLs, DynamoDB Streams
 
 ---
 
 ## ⏳ Phase 5: Queue Processing (SQS + Lambda)
-- [ ] Create `lib/constructs/queue-construct.ts` for standardized SQS queues
-- [ ] Create `lib/stacks/queue-stack.ts` for queue deployment unit
+- [ ] Create `lib/constructs/sqs-queue-construct.ts` for reusable SQS queues
+- [ ] Create `lib/constructs/lambda-event-source-construct.ts` for reusable event source mappings
+- [ ] Create `lib/stacks/queue-stack.ts` for queue deployment unit (uses above constructs)
 - [ ] Create SQS Standard queue
 - [ ] Create SQS FIFO queue
 - [ ] Add Dead Letter Queues
@@ -129,106 +139,121 @@ Each phase corresponds to an AWS service integration. Check off as you complete 
 - [ ] Message visibility timeout configuration
 - [ ] Update `bin/infra.ts` to include queue stack with dependencies
 - [ ] **COST CHECK**: SQS 1M requests free tier ✅
-- [ ] **LEARNING**: SQS Standard vs FIFO, DLQ patterns, Lambda event source mapping
+- [ ] **LEARNING**: SQS Standard vs FIFO, DLQ patterns, Lambda event source mapping, batch processing
 
 ---
 
 ## ⏳ Phase 6: Event-Driven Architecture (EventBridge)
-- [ ] Create `lib/constructs/eventbridge-construct.ts` for standardized event routing
-- [ ] Create `lib/stacks/events-stack.ts` for event-driven deployment unit
+- [ ] Create `lib/constructs/event-bus-construct.ts` for reusable EventBridge buses
+- [ ] Create `lib/constructs/event-rule-construct.ts` for reusable EventBridge rules
+- [ ] Create `lib/constructs/event-target-construct.ts` for reusable event targets
+- [ ] Create `lib/stacks/events-stack.ts` for event-driven deployment unit (uses above constructs)
 - [ ] Create EventBridge custom event bus
 - [ ] Scheduled rule for daily reports (cron)
 - [ ] Cross-service event routing
 - [ ] Lambda triggered by events
 - [ ] Update `bin/infra.ts` to include events stack with dependencies
 - [ ] **COST CHECK**: EventBridge 1M events free tier ✅
-- [ ] **LEARNING**: Event-driven architecture, event patterns, scheduled events
+- [ ] **LEARNING**: Event-driven architecture, event patterns, scheduled events, rule targets
 
 ---
 
 ## ⏳ Phase 7: Workflow Automation (Step Functions + SNS)
-- [ ] Create `lib/constructs/stepfunctions-construct.ts` for standardized workflows
-- [ ] Create `lib/constructs/notification-construct.ts` for standardized SNS topics
-- [ ] Create `lib/stacks/workflow-stack.ts` for workflow deployment unit
+- [ ] Create `lib/constructs/state-machine-construct.ts` for reusable Step Functions
+- [ ] Create `lib/constructs/sns-topic-construct.ts` for reusable SNS topics
+- [ ] Create `lib/constructs/sns-subscription-construct.ts` for reusable SNS subscriptions
+- [ ] Create `lib/stacks/workflow-stack.ts` for workflow deployment unit (uses above constructs)
 - [ ] Step Function for approvals
 - [ ] SNS notification on approval/rejection
 - [ ] Add error handling in Step Functions
 - [ ] Update `bin/infra.ts` to include workflow stack with dependencies
 - [ ] **COST CHECK**: Step Functions 4K transitions + SNS 1M requests free tier ✅
-- [ ] **LEARNING**: Step Functions state machines, SNS topics, workflow patterns
+- [ ] **LEARNING**: Step Functions state types, SNS topics, workflow error handling, retry strategies
 
 ---
 
 ## ⏳ Phase 8: Secrets & Configuration Management
-- [ ] Create `lib/constructs/secrets-construct.ts` for standardized secret management
-- [ ] Create `lib/stacks/secrets-stack.ts` for secrets deployment unit
+- [ ] Create `lib/constructs/secrets-manager-construct.ts` for reusable Secrets Manager secrets
+- [ ] Create `lib/constructs/parameter-store-construct.ts` for reusable Parameter Store parameters
+- [ ] Create `lib/stacks/secrets-stack.ts` for secrets deployment unit (uses above constructs)
 - [ ] Store database credentials in Secrets Manager
 - [ ] Store app config in Systems Manager Parameter Store
 - [ ] Lambda retrieval of secrets
 - [ ] Update `bin/infra.ts` to include secrets stack with dependencies
 - [ ] **COST CHECK**: Secrets Manager 30-day trial, Parameter Store 10K params free ✅
-- [ ] **LEARNING**: Secrets Manager vs Parameter Store, secret rotation, secure access patterns
+- [ ] **LEARNING**: Secrets Manager vs Parameter Store, secret rotation, secure access patterns, cost comparison
 
 ---
 
 ## ⏳ Phase 9: CI/CD (CodePipeline + CodeBuild)
-- [ ] Create `lib/constructs/pipeline-construct.ts` for standardized CI/CD pipelines
-- [ ] Create `lib/stacks/cicd-stack.ts` for CI/CD deployment unit
+- [ ] Create `lib/constructs/codepipeline-construct.ts` for reusable CodePipeline pipelines
+- [ ] Create `lib/constructs/codebuild-project-construct.ts` for reusable CodeBuild projects
+- [ ] Create `lib/constructs/github-source-construct.ts` for reusable GitHub source integration
+- [ ] Create `lib/stacks/cicd-stack.ts` for CI/CD deployment unit (uses above constructs)
 - [ ] Create GitHub → CodePipeline integration
 - [ ] React build + deploy automation
 - [ ] Backend CDK deploy automation
 - [ ] Add deployment scripts in `scripts/` directory
 - [ ] Update `bin/infra.ts` to include CI/CD stack with dependencies
 - [ ] **COST CHECK**: CodeBuild 100 minutes + CodePipeline 1 pipeline free tier ✅
-- [ ] **LEARNING**: CI/CD patterns, deployment strategies, build automation
+- [ ] **LEARNING**: CI/CD patterns, deployment strategies, build automation, pipeline stages
 
 ---
 
 ## ⏳ Phase 10: Monitoring (CloudWatch + X-Ray)
-- [ ] Create `lib/constructs/monitoring-construct.ts` for standardized monitoring
-- [ ] Create `lib/stacks/monitoring-stack.ts` for monitoring deployment unit
+- [ ] Create `lib/constructs/log-group-construct.ts` for reusable CloudWatch Log Groups
+- [ ] Create `lib/constructs/metric-construct.ts` for reusable CloudWatch Metrics
+- [ ] Create `lib/constructs/alarm-construct.ts` for reusable CloudWatch Alarms
+- [ ] Create `lib/constructs/xray-construct.ts` for reusable X-Ray tracing
+- [ ] Create `lib/stacks/monitoring-stack.ts` for monitoring deployment unit (uses above constructs)
 - [ ] Enable CloudWatch Logs
 - [ ] Add custom metrics
 - [ ] Create CloudWatch alarms
 - [ ] Enable X-Ray tracing
 - [ ] Update `bin/infra.ts` to include monitoring stack with dependencies
 - [ ] **COST CHECK**: CloudWatch 10 metrics + X-Ray 100K traces free tier ✅
-- [ ] **LEARNING**: CloudWatch metrics, alarms, X-Ray tracing, service maps
+- [ ] **LEARNING**: CloudWatch metrics/logs/alarms, X-Ray tracing, service maps, log insights
 
 ---
 
 ## ⏳ Phase 11: Advanced Lambda Features
-- [ ] Create `lib/constructs/advanced-lambda-construct.ts` for advanced Lambda patterns
-- [ ] Create `lib/stacks/advanced-lambda-stack.ts` for advanced Lambda deployment unit
+- [ ] Create `lib/constructs/lambda-version-construct.ts` for reusable Lambda versions
+- [ ] Create `lib/constructs/lambda-alias-construct.ts` for reusable Lambda aliases
+- [ ] Create `lib/constructs/lambda-provisioned-concurrency-construct.ts` for reusable provisioned concurrency
+- [ ] Create `lib/stacks/advanced-lambda-stack.ts` for advanced Lambda deployment unit (uses above constructs)
 - [ ] Lambda versions and aliases
 - [ ] Blue/green deployments
 - [ ] Lambda provisioned concurrency
 - [ ] Update `bin/infra.ts` to include advanced Lambda stack with dependencies
 - [ ] **COST CHECK**: Additional Lambda usage may exceed free tier ⚠️
-- [ ] **LEARNING**: Lambda versioning, aliases, blue/green deployments, concurrency patterns
+- [ ] **LEARNING**: Lambda versioning, aliases, traffic shifting, concurrency management
 
 ---
 
 ## ⏳ Phase 12: Container Services (ECS/Fargate/ECR)
-- [ ] Create `lib/constructs/container-construct.ts` for standardized container services
-- [ ] Create `lib/stacks/container-stack.ts` for container deployment unit
+- [ ] Create `lib/constructs/ecr-repository-construct.ts` for reusable ECR repositories
+- [ ] Create `lib/constructs/container-image-construct.ts` for reusable container images
+- [ ] Create `lib/constructs/container-lambda-construct.ts` for reusable container-based Lambdas
+- [ ] Create `lib/stacks/container-stack.ts` for container deployment unit (uses above constructs)
 - [ ] Containerize a Lambda function
 - [ ] Store image in ECR
 - [ ] Deploy container-based Lambda
 - [ ] Update `bin/infra.ts` to include container stack with dependencies
 - [ ] **COST CHECK**: ECR 500MB storage free, ECS/Fargate has charges ⚠️
-- [ ] **LEARNING**: Container patterns, ECR, ECS vs Fargate, container-based Lambda
+- [ ] **LEARNING**: Container patterns, ECR lifecycle policies, container-based Lambda, image optimization
 
 ---
 
 ## ⏳ Phase 13: Multi-Region Deployment (Advanced)
-- [ ] Create `lib/constructs/multiregion-construct.ts` for standardized multi-region patterns
-- [ ] Create `lib/stacks/multiregion-stack.ts` for multi-region deployment unit
+- [ ] Create `lib/constructs/route53-hosted-zone-construct.ts` for reusable Route 53 hosted zones
+- [ ] Create `lib/constructs/route53-record-construct.ts` for reusable Route 53 records
+- [ ] Create `lib/constructs/cross-region-replication-construct.ts` for reusable S3 replication
+- [ ] Create `lib/stacks/multiregion-stack.ts` for multi-region deployment unit (uses above constructs)
 - [ ] Deploy to two regions
 - [ ] Route 53 latency-based routing
 - [ ] Update `bin/infra.ts` to include multi-region stack with dependencies
 - [ ] **COST CHECK**: Route 53 $0.50/zone + data transfer charges ⚠️
-- [ ] **LEARNING**: Multi-region patterns, Route 53 routing, cross-region replication
+- [ ] **LEARNING**: Multi-region patterns, Route 53 routing policies, cross-region replication, failover strategies
 
 ---
 
