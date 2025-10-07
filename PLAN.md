@@ -1,363 +1,569 @@
-# 🚀 AWS Serverless Task Approval System (REST Edition) — Progress Tracker
+# 🚀 AWS Task Approval System - Complete Implementation Plan
 
-This file tracks implementation progress for the **AWS Developer Associate practice project**.  
-Each phase corresponds to an AWS service integration. Check off as you complete steps.
+## 📋 Application Overview
 
-## ⚠️ **COST MANAGEMENT & FREE TIER GUIDANCE**
+**What we're building:** A serverless task approval system where users can:
+1. Sign up and login
+2. Submit tasks for approval
+3. Managers can approve/reject tasks
+4. Receive notifications on status changes
+5. View task history
 
-### 🆓 **FREE TIER SERVICES (Safe to Use)**
-- **S3**: 5GB storage, 20,000 GET requests, 2,000 PUT requests/month
-- **CloudFront**: 1TB data transfer, 10,000,000 HTTP requests/month
-- **Lambda**: 1M requests, 400,000 GB-seconds compute/month
-- **API Gateway**: 1M API calls/month
-- **DynamoDB**: 25GB storage, 25 RCU, 25 WCU/month
-- **Cognito**: 50,000 MAU (Monthly Active Users)
-- **SNS**: 1M requests/month
-- **Step Functions**: 4,000 state transitions/month
-- **CloudWatch**: 10 custom metrics, 5GB log ingestion/month
-- **X-Ray**: 100,000 traces/month
-- **CodeBuild**: 100 build minutes/month
-- **CodePipeline**: 1 active pipeline/month
-- **SQS**: 1M requests/month
-- **EventBridge**: 1M events/month
-- **Secrets Manager**: 30 days free trial, then $0.40/secret/month
-- **Systems Manager Parameter Store**: 10,000 parameters (Standard tier)
+## 🏗️ Architecture Diagram
 
-### 💰 **POTENTIAL COST RISKS**
-- **Route 53**: $0.50/hosted zone/month + $0.40/query
-- **Multi-region**: Doubles most costs
-- **High traffic**: Exceeding free tier limits
-- **Data transfer**: Outbound data charges after free tier
+```
+┌─────────────┐
+│   Browser   │
+└──────┬──────┘
+       │
+       ↓
+┌─────────────────────────────────────────────────────────┐
+│                    CloudFront + S3                       │
+│                   (React Frontend)                       │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+                           ↓
+┌─────────────────────────────────────────────────────────┐
+│              Cognito (Authentication)                    │
+│         User Pool + Identity Pool + IAM Roles            │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+                           ↓
+┌─────────────────────────────────────────────────────────┐
+│           API Gateway (REST API + Authorizer)            │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+           ┌───────────────┼───────────────┐
+           ↓               ↓               ↓
+     ┌─────────┐     ┌─────────┐    ┌─────────┐
+     │ Lambda  │     │ Lambda  │    │ Lambda  │
+     │ Create  │     │  List   │    │ Approve │
+     └────┬────┘     └────┬────┘    └────┬────┘
+          │               │              │
+          └───────────────┼──────────────┘
+                          ↓
+              ┌───────────────────────┐
+              │  DynamoDB (Tasks)     │
+              └───────────────────────┘
+                          │
+                          ↓
+              ┌───────────────────────┐
+              │    SNS (Notifications)│
+              └───────────────────────┘
+```
 
-### 🧹 **CLEANUP REMINDERS**
-- **After each phase**: Run `cdk destroy` to avoid charges
-- **Daily**: Check AWS Billing Dashboard
-- **Weekly**: Review CloudWatch costs
-- **Before sleep**: Destroy non-essential resources
+## 📦 Complete Phase Breakdown
+
+Each phase is divided into:
+- **🏗️ Infrastructure**: CDK constructs and stacks
+- **⚙️ Backend**: Lambda function implementation
+- **🎨 Frontend**: React components and integration
+- **🔗 Integration**: Connecting everything together
 
 ---
 
 ## ✅ Phase 0: Setup
+
+### Prerequisites
 - [x] AWS CLI installed
 - [x] AWS CDK installed
 - [x] pnpm installed
-- [x] Monorepo structure created (`infra`, `backend`, `frontend`)
-- [x] GitHub repo initialized & pushed
-- [x] .gitignore files added (root + subprojects)
-- [x] .gitattributes added
-- [x] AWS CLI configured (`aws configure`)
+- [x] Monorepo structure created
+- [x] GitHub repo initialized
+- [x] AWS CLI configured
 - [x] CDK bootstrap completed
 
 ---
 
 ## ✅ Phase 1: Frontend Hosting (S3 + CloudFront)
-- [x] Create React app (Vite + TS)
-- [x] Deploy to S3 bucket
-- [x] Configure CloudFront distribution
-- [x] Test hosting via CloudFront URL
-- [x] **COST CHECK**: S3 + CloudFront within free tier ✅
 
-### **Phase 1.5: Infrastructure Structure Refactoring**
-- [ ] Create `config/environments.ts` for environment management
-- [ ] Create `lib/constructs/s3-bucket-construct.ts` for reusable S3 bucket
-- [ ] Create `lib/constructs/cloudfront-distribution-construct.ts` for reusable CloudFront
-- [ ] Create `lib/constructs/s3-deployment-construct.ts` for reusable S3 deployment
-- [ ] Create `lib/stacks/frontend-stack.ts` for frontend deployment unit (uses above constructs)
-- [ ] Update `bin/infra.ts` to use new structure
-- [ ] Backup old `lib/infra-stack.ts` as `.backup`
-- [ ] Deploy and verify new structure works
-- [ ] **LEARNING**: Single Responsibility Principle, stacks vs constructs, configuration management
+### 🏗️ Infrastructure
+- [x] Create React app (Vite + TS)
+- [x] Create S3 bucket
+- [x] Create CloudFront distribution
+- [x] Deploy frontend to S3
+
+### 🎨 Frontend
+- [x] Basic React app structure
+- [x] Build configuration
+
+### ✅ Result
+- Static website hosted on CloudFront
+
+---
+
+## ✅ Phase 1.5: Infrastructure Refactoring
+
+### 🏗️ Infrastructure
+- [x] Create `config/environments.ts`
+- [x] Create `s3-bucket-construct.ts`
+- [x] Create `cloudfront-distribution-construct.ts`
+- [x] Create `s3-deployment-construct.ts`
+- [x] Create `frontend-stack.ts`
+- [x] Update `bin/infra.ts`
+
+### ✅ Result
+- Modular, reusable CDK structure following SRP
 
 ---
 
 ## ⏳ Phase 2: Authentication (Cognito)
-- [ ] Create `lib/constructs/user-pool-construct.ts` for reusable Cognito User Pool
-- [ ] Create `lib/constructs/identity-pool-construct.ts` for reusable Cognito Identity Pool
-- [ ] Create `lib/constructs/iam-role-construct.ts` for reusable IAM roles
-- [ ] Create `lib/stacks/auth-stack.ts` for authentication deployment unit (uses above constructs)
-- [ ] Create Cognito User Pool with proper configuration
-- [ ] Create Cognito Identity Pool for AWS resource access
-- [ ] Setup IAM roles for authenticated users
-- [ ] Setup signup/login in React (Amplify/Auth SDK)
-- [ ] Add role-based access (Admin/User groups)
-- [ ] Update `bin/infra.ts` to include auth stack
-- [ ] **COST CHECK**: Cognito 50K MAU free tier ✅
-- [ ] **LEARNING**: User Pools vs Identity Pools, JWT tokens, IAM roles, federated identity
+
+### 🏗️ Infrastructure (CDK)
+- [ ] Create `lib/constructs/user-pool-construct.ts`
+  - Cognito User Pool configuration
+  - Email verification
+  - Password policy
+- [ ] Create `lib/constructs/identity-pool-construct.ts`
+  - Cognito Identity Pool
+  - Link to User Pool
+  - User Pool Client
+- [ ] Create `lib/constructs/iam-role-construct.ts`
+  - IAM role for authenticated users
+  - Basic Cognito permissions
+- [ ] Create `lib/stacks/auth-stack.ts`
+  - Compose above constructs
+  - Create role attachment
+  - Outputs (User Pool ID, Client ID, Identity Pool ID)
+- [ ] Update `config/environments.ts`
+  - Add auth configuration
+- [ ] Update `bin/infra.ts`
+  - Add auth stack
+- [ ] Deploy infrastructure
+
+### 🎨 Frontend (React)
+- [ ] Install Amplify libraries
+  - `npm install aws-amplify @aws-amplify/ui-react`
+- [ ] Create `src/config/aws-config.ts`
+  - Configure Amplify with Cognito details
+- [ ] Create `src/components/Auth/SignUp.tsx`
+  - Sign up form
+  - Email validation
+  - Password validation
+- [ ] Create `src/components/Auth/SignIn.tsx`
+  - Login form
+  - Error handling
+- [ ] Create `src/components/Auth/AuthProvider.tsx`
+  - Auth context
+  - Current user state
+  - Sign in/out methods
+- [ ] Update `src/App.tsx`
+  - Add AuthProvider
+  - Conditional rendering (logged in vs logged out)
+- [ ] Create `src/components/Layout/ProtectedRoute.tsx`
+  - Route guard for authenticated pages
+
+### 🔗 Integration & Testing
+- [ ] Get Cognito outputs from CDK
+- [ ] Update frontend config with real values
+- [ ] Test sign up flow
+- [ ] Test email verification
+- [ ] Test login flow
+- [ ] Test logout
+- [ ] Verify JWT tokens in browser (localStorage/sessionStorage)
+
+### ✅ Result
+- Users can sign up, verify email, login, and logout
+- JWT tokens stored in browser
+- Protected routes work
 
 ---
 
-## ⏳ Phase 3: REST API (API Gateway + Lambda)
-- [ ] Create `lib/constructs/lambda-function-construct.ts` for reusable Lambda functions
-- [ ] Create `lib/constructs/lambda-layer-construct.ts` for reusable Lambda layers
-- [ ] Create `lib/constructs/sqs-queue-construct.ts` for reusable SQS queues (DLQ)
-- [ ] Create `lib/constructs/api-gateway-construct.ts` for reusable REST API
-- [ ] Create `lib/constructs/api-authorizer-construct.ts` for reusable Cognito authorizer
-- [ ] Create `lib/stacks/api-stack.ts` for API deployment unit (uses above constructs)
-- [ ] Create Lambda functions for task operations (CRUD)
-- [ ] Create API Gateway REST API with proper configuration
-- [ ] Define endpoints (POST/GET/PUT/DELETE tasks)
-- [ ] Connect Lambdas with environment variables
-- [ ] Add Lambda layers for shared code
-- [ ] Configure Lambda concurrency limits
-- [ ] Add Dead Letter Queues (DLQ)
-- [ ] Secure with Cognito Authorizer
-- [ ] Update `bin/infra.ts` to include API stack with dependencies
-- [ ] **COST CHECK**: API Gateway 1M calls + Lambda 1M requests free tier ✅
-- [ ] **LEARNING**: Lambda patterns, API Gateway integration, request/response mapping, DLQ strategy
+## ⏳ Phase 3: REST API & Backend Logic (API Gateway + Lambda + DynamoDB)
+
+### 🏗️ Infrastructure (CDK)
+
+#### 3.1: Database Setup
+- [ ] Create `lib/constructs/dynamodb-table-construct.ts`
+  - On-demand billing
+  - Partition key: taskId
+  - Sort key: createdAt
+- [ ] Create `lib/constructs/dynamodb-gsi-construct.ts`
+  - GSI for querying by user
+  - GSI for querying by status
+- [ ] Create `lib/stacks/storage-stack.ts`
+  - Compose DynamoDB constructs
+  - Outputs (Table name, ARN)
+
+#### 3.2: Lambda Functions
+- [ ] Create `lib/constructs/lambda-function-construct.ts`
+  - Standardized Lambda configuration
+  - ARM64 architecture
+  - Environment variables support
+  - DLQ configuration
+- [ ] Create `lib/constructs/lambda-layer-construct.ts`
+  - Shared dependencies layer
+- [ ] Create `lib/stacks/api-stack.ts` (Part 1: Lambda setup)
+  - Lambda functions for CRUD operations
+  - Environment variables (table name, etc.)
+
+#### 3.3: API Gateway
+- [ ] Create `lib/constructs/api-gateway-construct.ts`
+  - REST API configuration
+  - CORS setup
+- [ ] Create `lib/constructs/api-authorizer-construct.ts`
+  - Cognito authorizer
+- [ ] Update `lib/stacks/api-stack.ts` (Part 2: API setup)
+  - Create API Gateway
+  - Connect Lambda integrations
+  - Add Cognito authorizer
+  - Define routes
+  - Outputs (API URL)
+- [ ] Update `bin/infra.ts`
+  - Add storage and API stacks
+  - Pass dependencies
+
+### ⚙️ Backend (Lambda Functions)
+
+Create in `backend/functions/`:
+
+#### Shared Code
+- [ ] Create `backend/functions/shared/types.ts`
+  - TypeScript interfaces for Task, User, etc.
+- [ ] Create `backend/functions/shared/responses.ts`
+  - Standard API response format
+  - Error response helper
+- [ ] Create `backend/functions/shared/dynamodb.ts`
+  - DynamoDB client setup
+  - Common query patterns
+
+#### Lambda Functions
+- [ ] Create `backend/functions/tasks/create.ts`
+  - POST /tasks
+  - Validate input
+  - Generate taskId
+  - Save to DynamoDB
+  - Return created task
+- [ ] Create `backend/functions/tasks/list.ts`
+  - GET /tasks
+  - Query user's tasks from DynamoDB
+  - Return task list
+- [ ] Create `backend/functions/tasks/get.ts`
+  - GET /tasks/{id}
+  - Get single task
+  - Check user permissions
+- [ ] Create `backend/functions/tasks/approve.ts`
+  - PUT /tasks/{id}/approve
+  - Check user is manager
+  - Update task status
+  - Return updated task
+- [ ] Create `backend/functions/tasks/reject.ts`
+  - PUT /tasks/{id}/reject
+  - Check user is manager
+  - Update task status
+  - Return updated task
+
+### 🎨 Frontend (React)
+
+Create in `frontend/src/`:
+
+#### API Configuration
+- [ ] Create `src/services/api-client.ts`
+  - Axios or Fetch wrapper
+  - Add JWT token to headers
+  - Error handling
+- [ ] Create `src/services/tasks-api.ts`
+  - createTask()
+  - listTasks()
+  - getTask()
+  - approveTask()
+  - rejectTask()
+
+#### Components
+- [ ] Create `src/components/Tasks/TaskForm.tsx`
+  - Form to create new task
+  - Title, description fields
+  - Submit button
+- [ ] Create `src/components/Tasks/TaskList.tsx`
+  - Display list of tasks
+  - Filter by status
+  - Click to view details
+- [ ] Create `src/components/Tasks/TaskDetail.tsx`
+  - Show task details
+  - Approve/Reject buttons (for managers)
+  - Status badge
+- [ ] Create `src/components/Tasks/TaskCard.tsx`
+  - Single task display
+  - Status indicator
+- [ ] Create `src/pages/Dashboard.tsx`
+  - Main page after login
+  - Shows task list
+  - Create task button
+- [ ] Create `src/pages/TaskDetailPage.tsx`
+  - Full task view
+  - Actions
+
+#### State Management
+- [ ] Create `src/hooks/useTasks.ts`
+  - Fetch tasks
+  - Create task
+  - Update task status
+- [ ] Create `src/context/TaskContext.tsx` (optional)
+  - Global task state
+
+### 🔗 Integration & Testing
+- [ ] Get API URL from CDK outputs
+- [ ] Update frontend config with API URL
+- [ ] Test creating a task
+- [ ] Test listing tasks
+- [ ] Test viewing task details
+- [ ] Test approving a task (as manager)
+- [ ] Test rejecting a task (as manager)
+- [ ] Verify data in DynamoDB console
+- [ ] Check Lambda logs in CloudWatch
+
+### ✅ Result
+- Complete CRUD operations working
+- Users can create tasks
+- Managers can approve/reject
+- All data persisted in DynamoDB
 
 ---
 
-## ⏳ Phase 4: Data Storage (DynamoDB + S3)
-- [ ] Create `lib/constructs/dynamodb-table-construct.ts` for reusable DynamoDB tables
-- [ ] Create `lib/constructs/dynamodb-gsi-construct.ts` for reusable Global Secondary Indexes
-- [ ] Create `lib/constructs/dynamodb-stream-construct.ts` for reusable DynamoDB Streams
-- [ ] Create `lib/constructs/s3-bucket-construct.ts` for reusable S3 buckets (file storage)
-- [ ] Create `lib/stacks/storage-stack.ts` for storage deployment unit (uses above constructs)
-- [ ] Create DynamoDB table for tasks (on-demand billing)
-- [ ] Add Global Secondary Index (GSI)
-- [ ] Add Local Secondary Index (LSI)
-- [ ] Enable DynamoDB Streams
-- [ ] Create S3 bucket for file storage
-- [ ] Lambda → DynamoDB integration
-- [ ] Generate signed S3 URLs
-- [ ] File uploads from React
-- [ ] Update `bin/infra.ts` to include storage stack with dependencies
-- [ ] **COST CHECK**: DynamoDB 25GB + S3 5GB free tier ✅
-- [ ] **LEARNING**: DynamoDB single-table design, GSI/LSI patterns, S3 pre-signed URLs, DynamoDB Streams
+## ⏳ Phase 4: User Roles & Permissions
+
+### 🏗️ Infrastructure (CDK)
+- [ ] Update `lib/constructs/user-pool-construct.ts`
+  - Add user groups (Admin, Manager, User)
+- [ ] Update `lib/stacks/auth-stack.ts`
+  - Create Cognito groups
+  - Define group IAM policies
+- [ ] Redeploy infrastructure
+
+### ⚙️ Backend (Lambda Functions)
+- [ ] Update `backend/functions/shared/auth.ts`
+  - Extract user groups from JWT token
+  - Authorization helper functions
+- [ ] Update `backend/functions/tasks/approve.ts`
+  - Check if user is in Manager/Admin group
+  - Return 403 if not authorized
+- [ ] Update `backend/functions/tasks/reject.ts`
+  - Check if user is in Manager/Admin group
+  - Return 403 if not authorized
+
+### 🎨 Frontend (React)
+- [ ] Create `src/hooks/useAuth.ts`
+  - Get current user
+  - Get user groups/roles
+  - Check permissions
+- [ ] Update `src/components/Tasks/TaskDetail.tsx`
+  - Show approve/reject only for managers
+  - Conditional rendering based on role
+- [ ] Create `src/components/Admin/UserManagement.tsx` (optional)
+  - Admin UI to assign roles
+
+### 🔗 Integration & Testing
+- [ ] Manually add user to Manager group in Cognito
+- [ ] Login as manager
+- [ ] Verify approve/reject buttons show
+- [ ] Login as regular user
+- [ ] Verify approve/reject buttons hidden
+- [ ] Test API returns 403 for unauthorized access
+
+### ✅ Result
+- Role-based access control working
+- Only managers can approve/reject
+- UI adapts based on user role
 
 ---
 
-## ⏳ Phase 5: Queue Processing (SQS + Lambda)
-- [ ] Create `lib/constructs/sqs-queue-construct.ts` for reusable SQS queues
-- [ ] Create `lib/constructs/lambda-event-source-construct.ts` for reusable event source mappings
-- [ ] Create `lib/stacks/queue-stack.ts` for queue deployment unit (uses above constructs)
-- [ ] Create SQS Standard queue
-- [ ] Create SQS FIFO queue
-- [ ] Add Dead Letter Queues
-- [ ] Configure long polling
-- [ ] Lambda triggered by SQS messages
-- [ ] Message visibility timeout configuration
-- [ ] Update `bin/infra.ts` to include queue stack with dependencies
-- [ ] **COST CHECK**: SQS 1M requests free tier ✅
-- [ ] **LEARNING**: SQS Standard vs FIFO, DLQ patterns, Lambda event source mapping, batch processing
+## ⏳ Phase 5: Notifications (SNS)
+
+### 🏗️ Infrastructure (CDK)
+- [ ] Create `lib/constructs/sns-topic-construct.ts`
+  - SNS topic for notifications
+- [ ] Create `lib/constructs/sns-subscription-construct.ts`
+  - Email subscriptions
+- [ ] Update `lib/stacks/api-stack.ts`
+  - Add SNS topic
+  - Grant Lambda publish permissions
+- [ ] Redeploy infrastructure
+
+### ⚙️ Backend (Lambda Functions)
+- [ ] Create `backend/functions/shared/notifications.ts`
+  - SNS client setup
+  - Send notification helper
+- [ ] Update `backend/functions/tasks/create.ts`
+  - Send notification on task creation
+- [ ] Update `backend/functions/tasks/approve.ts`
+  - Send notification on approval
+- [ ] Update `backend/functions/tasks/reject.ts`
+  - Send notification on rejection
+
+### 🎨 Frontend (React)
+- [ ] Create `src/components/Settings/NotificationSettings.tsx`
+  - User can enter email for notifications
+  - Subscribe to SNS topic
+- [ ] Update `src/pages/Dashboard.tsx`
+  - Add link to notification settings
+
+### 🔗 Integration & Testing
+- [ ] Subscribe email to SNS topic
+- [ ] Confirm subscription via email
+- [ ] Create a task
+- [ ] Verify email notification received
+- [ ] Approve a task
+- [ ] Verify email notification received
+
+### ✅ Result
+- Email notifications on task events
+- Users receive updates on their tasks
 
 ---
 
-## ⏳ Phase 6: Event-Driven Architecture (EventBridge)
-- [ ] Create `lib/constructs/event-bus-construct.ts` for reusable EventBridge buses
-- [ ] Create `lib/constructs/event-rule-construct.ts` for reusable EventBridge rules
-- [ ] Create `lib/constructs/event-target-construct.ts` for reusable event targets
-- [ ] Create `lib/stacks/events-stack.ts` for event-driven deployment unit (uses above constructs)
-- [ ] Create EventBridge custom event bus
-- [ ] Scheduled rule for daily reports (cron)
-- [ ] Cross-service event routing
-- [ ] Lambda triggered by events
-- [ ] Update `bin/infra.ts` to include events stack with dependencies
-- [ ] **COST CHECK**: EventBridge 1M events free tier ✅
-- [ ] **LEARNING**: Event-driven architecture, event patterns, scheduled events, rule targets
+## ⏳ Phase 6: File Attachments (S3)
+
+### 🏗️ Infrastructure (CDK)
+- [ ] Create new S3 bucket construct for file storage
+- [ ] Update `lib/stacks/storage-stack.ts`
+  - Add file storage bucket
+  - Grant Lambda permissions
+- [ ] Update Lambda IAM policies
+  - Allow S3 GetObject/PutObject
+- [ ] Redeploy infrastructure
+
+### ⚙️ Backend (Lambda Functions)
+- [ ] Create `backend/functions/shared/s3.ts`
+  - S3 client setup
+  - Generate pre-signed URLs
+- [ ] Create `backend/functions/files/get-upload-url.ts`
+  - POST /files/upload-url
+  - Generate pre-signed URL for upload
+  - Return URL
+- [ ] Create `backend/functions/files/get-download-url.ts`
+  - GET /files/{fileId}/download-url
+  - Generate pre-signed URL for download
+  - Return URL
+- [ ] Update `backend/functions/tasks/create.ts`
+  - Accept file attachments
+  - Store file references in DynamoDB
+
+### 🎨 Frontend (React)
+- [ ] Create `src/components/Files/FileUpload.tsx`
+  - File input
+  - Upload to pre-signed URL
+  - Progress indicator
+- [ ] Create `src/components/Files/FileList.tsx`
+  - Display attached files
+  - Download links
+- [ ] Update `src/components/Tasks/TaskForm.tsx`
+  - Add file upload component
+- [ ] Update `src/components/Tasks/TaskDetail.tsx`
+  - Show attached files
+  - Download buttons
+
+### 🔗 Integration & Testing
+- [ ] Upload a file when creating task
+- [ ] Verify file in S3 console
+- [ ] Download file from task detail page
+- [ ] Verify correct file downloads
+
+### ✅ Result
+- Users can attach files to tasks
+- Files stored securely in S3
+- Pre-signed URLs for secure access
 
 ---
 
-## ⏳ Phase 7: Workflow Automation (Step Functions + SNS)
-- [ ] Create `lib/constructs/state-machine-construct.ts` for reusable Step Functions
-- [ ] Create `lib/constructs/sns-topic-construct.ts` for reusable SNS topics
-- [ ] Create `lib/constructs/sns-subscription-construct.ts` for reusable SNS subscriptions
-- [ ] Create `lib/stacks/workflow-stack.ts` for workflow deployment unit (uses above constructs)
-- [ ] Step Function for approvals
-- [ ] SNS notification on approval/rejection
-- [ ] Add error handling in Step Functions
-- [ ] Update `bin/infra.ts` to include workflow stack with dependencies
-- [ ] **COST CHECK**: Step Functions 4K transitions + SNS 1M requests free tier ✅
-- [ ] **LEARNING**: Step Functions state types, SNS topics, workflow error handling, retry strategies
+## ⏳ Phase 7: Queue Processing (SQS)
+
+### 🏗️ Infrastructure (CDK)
+- [ ] Create `lib/constructs/sqs-queue-construct.ts`
+  - Standard queue for async processing
+  - Dead Letter Queue
+- [ ] Update `lib/stacks/api-stack.ts`
+  - Add SQS queue
+  - Connect Lambda to SQS trigger
+  - Grant permissions
+- [ ] Redeploy infrastructure
+
+### ⚙️ Backend (Lambda Functions)
+- [ ] Create `backend/functions/queue/process-approval.ts`
+  - Triggered by SQS messages
+  - Process approval workflow
+  - Send notifications
+- [ ] Update `backend/functions/tasks/approve.ts`
+  - Send message to SQS instead of direct processing
+  - Return immediately
+- [ ] Update `backend/functions/tasks/reject.ts`
+  - Send message to SQS instead of direct processing
+  - Return immediately
+
+### 🔗 Integration & Testing
+- [ ] Approve a task
+- [ ] Verify message sent to SQS
+- [ ] Verify Lambda processes message
+- [ ] Verify notification sent
+- [ ] Check DLQ for any failures
+
+### ✅ Result
+- Async processing of approvals
+- Improved API response times
+- Reliable message processing with DLQ
 
 ---
 
-## ⏳ Phase 8: Secrets & Configuration Management
-- [ ] Create `lib/constructs/secrets-manager-construct.ts` for reusable Secrets Manager secrets
-- [ ] Create `lib/constructs/parameter-store-construct.ts` for reusable Parameter Store parameters
-- [ ] Create `lib/stacks/secrets-stack.ts` for secrets deployment unit (uses above constructs)
-- [ ] Store database credentials in Secrets Manager
-- [ ] Store app config in Systems Manager Parameter Store
-- [ ] Lambda retrieval of secrets
-- [ ] Update `bin/infra.ts` to include secrets stack with dependencies
-- [ ] **COST CHECK**: Secrets Manager 30-day trial, Parameter Store 10K params free ✅
-- [ ] **LEARNING**: Secrets Manager vs Parameter Store, secret rotation, secure access patterns, cost comparison
+## ⏳ Phase 8: Advanced Features
+
+### Step Functions Workflow
+- [ ] Create approval workflow state machine
+- [ ] Multi-step approval process
+- [ ] Automatic escalation
+
+### CloudWatch Monitoring
+- [ ] Custom metrics dashboard
+- [ ] Alarms for errors
+- [ ] Log insights queries
+
+### CI/CD Pipeline
+- [ ] CodePipeline for frontend
+- [ ] Automatic deployment on Git push
+- [ ] Build and test stages
 
 ---
 
-## ⏳ Phase 9: CI/CD (CodePipeline + CodeBuild)
-- [ ] Create `lib/constructs/codepipeline-construct.ts` for reusable CodePipeline pipelines
-- [ ] Create `lib/constructs/codebuild-project-construct.ts` for reusable CodeBuild projects
-- [ ] Create `lib/constructs/github-source-construct.ts` for reusable GitHub source integration
-- [ ] Create `lib/stacks/cicd-stack.ts` for CI/CD deployment unit (uses above constructs)
-- [ ] Create GitHub → CodePipeline integration
-- [ ] React build + deploy automation
-- [ ] Backend CDK deploy automation
-- [ ] Add deployment scripts in `scripts/` directory
-- [ ] Update `bin/infra.ts` to include CI/CD stack with dependencies
-- [ ] **COST CHECK**: CodeBuild 100 minutes + CodePipeline 1 pipeline free tier ✅
-- [ ] **LEARNING**: CI/CD patterns, deployment strategies, build automation, pipeline stages
+## 🎯 Integration Checklist
+
+At each phase, ensure:
+- [ ] Infrastructure deployed successfully
+- [ ] Backend functions tested individually
+- [ ] Frontend updated with new API endpoints
+- [ ] End-to-end flow works
+- [ ] Documentation updated in IMPLEMENTATION.md
+- [ ] Free tier usage monitored
 
 ---
 
-## ⏳ Phase 10: Monitoring (CloudWatch + X-Ray)
-- [ ] Create `lib/constructs/log-group-construct.ts` for reusable CloudWatch Log Groups
-- [ ] Create `lib/constructs/metric-construct.ts` for reusable CloudWatch Metrics
-- [ ] Create `lib/constructs/alarm-construct.ts` for reusable CloudWatch Alarms
-- [ ] Create `lib/constructs/xray-construct.ts` for reusable X-Ray tracing
-- [ ] Create `lib/stacks/monitoring-stack.ts` for monitoring deployment unit (uses above constructs)
-- [ ] Enable CloudWatch Logs
-- [ ] Add custom metrics
-- [ ] Create CloudWatch alarms
-- [ ] Enable X-Ray tracing
-- [ ] Update `bin/infra.ts` to include monitoring stack with dependencies
-- [ ] **COST CHECK**: CloudWatch 10 metrics + X-Ray 100K traces free tier ✅
-- [ ] **LEARNING**: CloudWatch metrics/logs/alarms, X-Ray tracing, service maps, log insights
+## 📚 Key Learning Focus
+
+### Infrastructure (CDK)
+- Single Responsibility Principle
+- Composition patterns
+- Environment management
+
+### Backend (Lambda)
+- Serverless patterns
+- Error handling
+- Authorization
+
+### Frontend (React)
+- Authentication flow
+- API integration
+- State management
+
+### Integration
+- How AWS services connect
+- Security (IAM, Cognito)
+- Asynchronous patterns
 
 ---
 
-## ⏳ Phase 11: Advanced Lambda Features
-- [ ] Create `lib/constructs/lambda-version-construct.ts` for reusable Lambda versions
-- [ ] Create `lib/constructs/lambda-alias-construct.ts` for reusable Lambda aliases
-- [ ] Create `lib/constructs/lambda-provisioned-concurrency-construct.ts` for reusable provisioned concurrency
-- [ ] Create `lib/stacks/advanced-lambda-stack.ts` for advanced Lambda deployment unit (uses above constructs)
-- [ ] Lambda versions and aliases
-- [ ] Blue/green deployments
-- [ ] Lambda provisioned concurrency
-- [ ] Update `bin/infra.ts` to include advanced Lambda stack with dependencies
-- [ ] **COST CHECK**: Additional Lambda usage may exceed free tier ⚠️
-- [ ] **LEARNING**: Lambda versioning, aliases, traffic shifting, concurrency management
+## 🚨 Cost Management
 
----
+**Stay within free tier:**
+- Monitor usage daily
+- Run `cdk destroy` when not developing
+- Check billing dashboard weekly
 
-## ⏳ Phase 12: Container Services (ECS/Fargate/ECR)
-- [ ] Create `lib/constructs/ecr-repository-construct.ts` for reusable ECR repositories
-- [ ] Create `lib/constructs/container-image-construct.ts` for reusable container images
-- [ ] Create `lib/constructs/container-lambda-construct.ts` for reusable container-based Lambdas
-- [ ] Create `lib/stacks/container-stack.ts` for container deployment unit (uses above constructs)
-- [ ] Containerize a Lambda function
-- [ ] Store image in ECR
-- [ ] Deploy container-based Lambda
-- [ ] Update `bin/infra.ts` to include container stack with dependencies
-- [ ] **COST CHECK**: ECR 500MB storage free, ECS/Fargate has charges ⚠️
-- [ ] **LEARNING**: Container patterns, ECR lifecycle policies, container-based Lambda, image optimization
-
----
-
-## ⏳ Phase 13: Multi-Region Deployment (Advanced)
-- [ ] Create `lib/constructs/route53-hosted-zone-construct.ts` for reusable Route 53 hosted zones
-- [ ] Create `lib/constructs/route53-record-construct.ts` for reusable Route 53 records
-- [ ] Create `lib/constructs/cross-region-replication-construct.ts` for reusable S3 replication
-- [ ] Create `lib/stacks/multiregion-stack.ts` for multi-region deployment unit (uses above constructs)
-- [ ] Deploy to two regions
-- [ ] Route 53 latency-based routing
-- [ ] Update `bin/infra.ts` to include multi-region stack with dependencies
-- [ ] **COST CHECK**: Route 53 $0.50/zone + data transfer charges ⚠️
-- [ ] **LEARNING**: Multi-region patterns, Route 53 routing policies, cross-region replication, failover strategies
-
----
-
-## 🧹 **COMPREHENSIVE CLEUP CHECKLIST**
-
-### **Immediate Cleanup (After Each Phase)**
-- [ ] Run `cdk destroy` to remove all resources
-- [ ] Check AWS Billing Dashboard for unexpected charges
-- [ ] Verify all resources are deleted in AWS Console
-
-### **Service-Specific Cleanup**
-- [ ] **S3**: Delete all buckets and objects
-- [ ] **CloudFront**: Delete distributions
-- [ ] **Cognito**: Delete user pools
-- [ ] **API Gateway**: Delete APIs
-- [ ] **Lambda**: Delete functions and layers
-- [ ] **DynamoDB**: Delete tables
-- [ ] **SQS**: Delete queues
-- [ ] **EventBridge**: Delete rules and event buses
-- [ ] **Step Functions**: Delete state machines
-- [ ] **SNS**: Delete topics
-- [ ] **Secrets Manager**: Delete secrets
-- [ ] **Systems Manager**: Delete parameters
-- [ ] **CodePipeline**: Delete pipelines
-- [ ] **CodeBuild**: Delete projects
-- [ ] **CloudWatch**: Delete log groups and alarms
-- [ ] **X-Ray**: Delete traces
-- [ ] **Route 53**: Delete hosted zones
-- [ ] **ECR**: Delete repositories
-- [ ] **ECS**: Delete clusters and services
-
-### **Final Cleanup Commands**
-```bash
-# Destroy CDK stack
-cd infra && cdk destroy
-
-# Check for remaining resources
-aws s3 ls
-aws lambda list-functions
-aws dynamodb list-tables
-aws sqs list-queues
-aws sns list-topics
-aws stepfunctions list-state-machines
-aws events list-rules
-aws cognito-idp list-user-pools
-aws apigateway get-rest-apis
-aws logs describe-log-groups
-```
-
----
-
-## 📚 **CERTIFICATION FOCUS AREAS**
-
-### **High Priority (Heavily Tested)**
-1. **Lambda**: Versions, aliases, layers, DLQ, concurrency, environment variables
-2. **SQS**: Standard vs FIFO, DLQ, long polling, visibility timeout
-3. **DynamoDB**: GSI, LSI, streams, capacity modes, on-demand vs provisioned
-4. **API Gateway**: Throttling, usage plans, stages, request/response transformations
-5. **IAM**: Policies, roles, policy evaluation logic
-6. **Elastic Beanstalk**: Deployment strategies (study theory - not practical)
-
-### **Medium Priority**
-7. **CloudFormation**: Templates, stacks, parameters, outputs
-8. **CodePipeline/CodeBuild/CodeDeploy**: CI/CD workflows
-9. **ECS/Fargate/ECR**: Container services
-10. **EventBridge**: Event-driven architecture
-11. **Secrets Manager/Parameter Store**: Configuration management
-
-### **Lower Priority**
-12. **X-Ray**: Basic tracing concepts
-13. **CloudWatch**: Logs, metrics, alarms
-14. **Multi-region**: Less frequently tested
-
----
-
-## 🎯 **STUDY STRATEGY**
-
-### **Phase 1-10**: Hands-on Learning (Free Tier Safe)
-- Build and experiment with each service
-- Focus on practical implementation
-- Take notes on service interactions
-
-### **Phase 11-13**: Theory + Limited Practice
-- Study Elastic Beanstalk, ECS theory
-- Practice with cost monitoring
-- Use AWS Free Tier calculator
-
-### **Final Preparation**
-- AWS practice exams
-- Review service limits and quotas
-- Understand pricing models
-- Practice troubleshooting scenarios
-
----
-
-## 🚨 **COST ALERTS**
-
-**STOP IMMEDIATELY IF YOU SEE:**
-- Route 53 charges
-- Data transfer charges > $1
-- Lambda charges > $5
-- Any service charges > $10
-
-**MONITOR DAILY:**
-- AWS Billing Dashboard
-- CloudWatch costs
-- Service usage vs free tier limits
+**Free tier safe phases:** 1-7
+**Cost warning phases:** 8+ (Step Functions, advanced monitoring)
