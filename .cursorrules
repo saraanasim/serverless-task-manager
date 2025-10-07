@@ -1,0 +1,323 @@
+# AWS Task Approval System - Cursor Rules
+
+## Project Overview
+
+This is a **learning project** for AWS Developer Associate certification.
+
+**Primary Focus**: AWS services and CDK infrastructure, NOT frontend/backend complexity.
+**Cost Constraint**: MUST stay within AWS Free Tier.
+**Learning Approach**: Understand WHY not just HOW.
+
+## Project Documentation
+
+- **PLAN.md**: Implementation plan for all phases
+- **IMPLEMENTATION.md**: Completed work documentation
+- **Always check these files** before making suggestions
+
+## Project Structure
+
+```
+aws-task-approval-system/
+├── frontend/                    # React + Vite + TypeScript
+│   ├── src/
+│   ├── dist/                   # Build output (deployed to S3)
+│   └── package.json
+├── backend/                     # Lambda functions
+│   └── functions/
+├── infra/                       # AWS CDK Infrastructure
+│   ├── config/
+│   │   └── environments.ts     # Environment configuration (dev/prod)
+│   ├── lib/
+│   │   ├── constructs/         # Reusable CDK constructs (single-purpose)
+│   │   └── stacks/             # CDK stacks (compose constructs)
+│   ├── bin/
+│   │   └── infra.ts            # CDK app entry point
+│   └── package.json
+├── PLAN.md
+├── IMPLEMENTATION.md
+└── .cursorrules
+```
+
+## Architecture Principles
+
+### 1. Single Responsibility Principle (SRP)
+- Each construct does ONE thing only
+- Example: `s3-bucket-construct.ts` ONLY creates S3 buckets
+- Example: `cloudfront-distribution-construct.ts` ONLY creates CloudFront distributions
+- **Never** create composite constructs that do multiple things
+
+### 2. Composition Over Inheritance
+- Stacks **compose** multiple single-purpose constructs
+- Constructs should be reusable across different stacks
+- Keep constructs independent and loosely coupled
+
+### 3. Configuration Management
+- Environment-specific config in `infra/config/environments.ts`
+- Use TypeScript interfaces for type safety
+- No hardcoded values in stacks or constructs
+
+### 4. Free Tier Optimization
+- **Always** check if changes might exceed free tier
+- Add comments explaining free tier optimizations
+- Refer to free tier limits section below
+
+## Naming Conventions
+
+### Files
+- Constructs: `[service]-construct.ts` (e.g., `s3-bucket-construct.ts`)
+- Stacks: `[purpose]-stack.ts` (e.g., `frontend-stack.ts`)
+- Config: `environments.ts` (plural)
+- Lowercase with hyphens
+
+### Classes
+- Constructs: `[Service]Construct` (e.g., `S3BucketConstruct`)
+- Stacks: `[Purpose]Stack` (e.g., `FrontendStack`)
+- PascalCase
+
+### Props Interfaces
+- Pattern: `[ClassName]Props`
+- Example: `S3BucketConstructProps`, `FrontendStackProps`
+
+### Resource Naming
+- Stack names: `${prefix}-${purpose}-${environment}`
+- Example: `TaskApproval-Frontend-Dev`
+- Use config for consistency
+
+## CDK Patterns
+
+### Construct Structure
+```typescript
+export interface [Name]ConstructProps {
+  // Required props first
+  requiredProp: Type;
+  // Optional props with ? 
+  optionalProp?: Type;
+}
+
+export class [Name]Construct extends Construct {
+  // Public readonly exports
+  public readonly resource: ResourceType;
+
+  constructor(scope: Construct, id: string, props: [Name]ConstructProps) {
+    super(scope, id);
+    
+    // Implementation
+    // Add free tier comments where relevant
+  }
+}
+```
+
+### Stack Structure
+```typescript
+export interface [Name]StackProps extends cdk.StackProps {
+  config: EnvironmentConfig;
+}
+
+export class [Name]Stack extends cdk.Stack {
+  // Public exports for other stacks
+  public readonly resource: ResourceType;
+
+  constructor(scope: Construct, id: string, props: [Name]StackProps) {
+    super(scope, id, props);
+
+    // 1. Create constructs
+    // 2. Store references
+    // 3. Apply tags
+    // 4. Create outputs
+  }
+}
+```
+
+## AWS Service Patterns
+
+### S3 Buckets
+- Always private (`publicReadAccess: false`)
+- Always encrypted (`encryption: S3_MANAGED` for free tier)
+- No versioning for free tier (`versioned: false`)
+- Enable auto-cleanup (`removalPolicy: DESTROY`, `autoDeleteObjects: true`)
+
+### CloudFront
+- Use OAI for S3 origins (security best practice)
+- Use `PRICE_CLASS_100` for free tier (US, Canada, Europe only)
+- Use `CACHING_OPTIMIZED` cache policy
+- Always redirect HTTP to HTTPS
+
+### Lambda
+- Use ARM64 architecture (cheaper, faster)
+- Use Node.js 18.x or Python 3.11
+- Add Dead Letter Queues (DLQ)
+- Configure timeout appropriately
+- Configure memory appropriately (start with 128MB)
+
+### DynamoDB
+- Use on-demand billing for free tier
+- Use single-table design when possible
+- Add GSI/LSI as needed
+- Enable point-in-time recovery for production
+
+### API Gateway
+- Use REST API (not HTTP API) for full features
+- Configure CORS properly
+- Use Cognito authorizers for authentication
+- Add throttling and usage plans
+
+## Code Style
+
+### TypeScript
+- Use strict TypeScript (`strict: true`)
+- No `any` types - use proper typing
+- Use interfaces for props
+- Export types/interfaces
+
+### Comments
+- Explain WHY not WHAT
+- Add "FREE TIER" comments for cost optimizations
+- Document security decisions
+- Document exam-relevant concepts
+
+### Imports
+- Group by: AWS CDK, other libraries, local imports
+- Use named imports
+- Keep alphabetical within groups
+
+## Development Workflow
+
+### Before Creating New Code
+1. Check PLAN.md for phase requirements
+2. Check IMPLEMENTATION.md for what's already done
+3. Identify which constructs are needed (single-purpose!)
+4. Check if similar constructs exist to reuse
+
+### When Creating New Constructs
+1. Create in `infra/lib/constructs/`
+2. Follow naming convention: `[service]-construct.ts`
+3. Single responsibility only
+4. Add props interface
+5. Add free tier comments
+6. Export public resources
+
+### When Creating New Stacks
+1. Create in `infra/lib/stacks/`
+2. Follow naming convention: `[purpose]-stack.ts`
+3. Compose existing constructs
+4. Use environment config
+5. Apply tags
+6. Create outputs with exportName
+
+### When Modifying Configuration
+1. Update `infra/config/environments.ts`
+2. Update both `devConfig` and `prodConfig`
+3. Maintain type safety
+
+### Deployment Process
+1. `cd frontend && pnpm build` (if frontend changed)
+2. `cd infra && pnpm build` (compile TypeScript)
+3. `cdk diff` (review changes)
+4. `cdk deploy` (deploy changes)
+5. Test and verify
+
+## Testing Approach
+
+### Manual Testing
+- Always test in AWS Console
+- Verify resources created correctly
+- Test actual functionality
+- Check CloudWatch logs
+
+### Verification Steps
+- Check IMPLEMENTATION.md for verification steps
+- Run AWS CLI commands to verify resources
+- Check billing dashboard (stay in free tier!)
+
+## Common Mistakes to Avoid
+
+### ❌ DON'T
+- Create composite constructs (violates SRP)
+- Hardcode values (use config)
+- Use S3 website endpoints with CloudFront (use bucket endpoints)
+- Enable S3 versioning (costs money)
+- Use expensive CloudFront price classes
+- Skip free tier comments
+- Make frontend complex (focus is AWS, not UI)
+- Implement multiple phases at once
+
+### ✅ DO
+- Create single-purpose constructs
+- Use environment configuration
+- Use S3 bucket endpoints with OAI
+- Optimize for free tier
+- Add explanatory comments
+- Keep frontend simple
+- Follow the phased approach in PLAN.md
+- Document everything in IMPLEMENTATION.md
+
+## Free Tier Limits (Reference)
+
+- **S3**: 5GB storage, 20K GET, 2K PUT/month
+- **CloudFront**: 1TB transfer, 10M requests/month
+- **Lambda**: 1M requests, 400K GB-seconds/month
+- **API Gateway**: 1M calls/month
+- **DynamoDB**: 25GB, 25 RCU, 25 WCU/month
+- **Cognito**: 50K MAU
+- **SQS**: 1M requests/month
+- **SNS**: 1M requests/month
+- **EventBridge**: 1M events/month
+- **Step Functions**: 4K state transitions/month
+- **CloudWatch**: 10 metrics, 5GB logs/month
+- **X-Ray**: 100K traces/month
+- **CodeBuild**: 100 build minutes/month
+- **CodePipeline**: 1 active pipeline/month
+- **Secrets Manager**: 30-day trial, then $0.40/secret/month
+- **Parameter Store**: 10K parameters (Standard tier, free)
+
+### Potential Cost Risks
+- **Route 53**: $0.50/hosted zone/month (NOT free)
+- **Multi-region**: Doubles most costs
+- **High traffic**: Exceeding free tier limits
+- **Data transfer**: Outbound data charges after free tier
+
+## Learning Goals
+
+This project is for **AWS Developer Associate certification**. Focus on:
+
+### High Priority (Heavily Tested)
+1. Lambda (versions, aliases, layers, DLQ, concurrency)
+2. SQS (Standard vs FIFO, DLQ, polling)
+3. DynamoDB (GSI, LSI, streams, capacity modes)
+4. API Gateway (throttling, stages, authorizers)
+5. IAM (policies, roles, evaluation)
+
+### Medium Priority
+6. CloudFormation/CDK
+7. CodePipeline/CodeBuild
+8. ECS/Fargate/ECR
+9. EventBridge
+10. Secrets Manager/Parameter Store
+
+### Lower Priority
+11. X-Ray
+12. CloudWatch
+13. Multi-region
+
+## Communication Style
+
+When assisting with this project:
+
+1. **Always check context first**: Read PLAN.md and IMPLEMENTATION.md
+2. **Explain WHY**: This is a learning project - explain concepts
+3. **Follow the plan**: Stick to the phased approach
+4. **Cost awareness**: Always mention free tier implications
+5. **Industry standards**: Teach best practices, not shortcuts
+6. **Be thorough**: Provide complete implementations, not partial
+7. **Document everything**: Update IMPLEMENTATION.md when phases complete
+
+## Final Notes
+
+This is a **hands-on learning project**. The goal is:
+- Understand AWS services deeply
+- Learn industry-standard patterns
+- Practice for certification
+- Stay within free tier
+- Document the learning journey
+
+**When in doubt, refer to PLAN.md and IMPLEMENTATION.md!**
