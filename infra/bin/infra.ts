@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
 import { FrontendStack } from '../lib/stacks/frontend-stack';
+import { AuthStack } from '../lib/stacks/auth-stack';
 import { devConfig, prodConfig } from '../config/environments';
 
 const app = new cdk.App();
@@ -11,6 +12,16 @@ const config = environment === 'prod' ? prodConfig : devConfig;
 
 // Create frontend stack
 new FrontendStack(app, `${config.naming.prefix}-Frontend-${config.naming.suffix}`, {
+  env: { 
+    account: process.env.CDK_DEFAULT_ACCOUNT, 
+    region: config.region 
+  },
+  config,
+  tags: config.tags,
+});
+
+// Create auth stack
+new AuthStack(app, `${config.naming.prefix}-Auth-${config.naming.suffix}`, {
   env: { 
     account: process.env.CDK_DEFAULT_ACCOUNT, 
     region: config.region 
