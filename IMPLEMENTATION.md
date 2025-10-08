@@ -649,23 +649,900 @@ All resources deleted regardless of structure (monolithic or modular).
 
 ---
 
-## ⏳ Phase 2: Authentication (Cognito)
+## ✅ Phase 2: Authentication (Cognito)
+
+### **What Was Done**
+
+Implemented a complete user authentication system using AWS Cognito, including user registration, email verification, sign in/out, and protected routes in the frontend.
 
 ### **Implementation Steps**
 
-_To be completed_
+#### **Part 1: Infrastructure (CDK)**
 
-### **Key Concepts to Learn**
+##### **1. Updated Environment Configuration**
 
-- Cognito User Pools vs Identity Pools
-- JWT tokens (ID token, Access token, Refresh token)
-- User authentication flow
-- Role-based access control
-- IAM roles for authenticated users
+**File Updated: `infra/config/environments.ts`**
+
+- **What**: Added authentication configuration to existing environment config
+- **Why**: Centralized auth settings for different environments (dev/prod)
+- **Added**:
+  - Password policy configuration
+  - User Pool and Identity Pool naming
+  - Dev config: Easier password policy for testing (no special characters required)
+  - Prod config: Stronger password policy with special characters
+
+##### **2. Created User Pool Construct**
+
+**File Created: `infra/lib/constructs/user-pool-construct.ts`**
+
+- **What**: Reusable construct for creating Cognito User Pools
+- **Why**: User Pool is the user directory (authentication)
+- **Configuration**:
+  - Sign-in with email (not username)
+  - Self sign-up enabled
+  - Email verification required
+  - Password policy from config
+  - Account recovery via email only
+  - MFA disabled (FREE TIER optimization)
+  - Advanced security disabled (FREE TIER optimization)
+- **FREE TIER**: 50,000 MAU (Monthly Active Users)
+
+##### **3. Created User Pool Client Construct**
+
+**File Created: `infra/lib/constructs/user-pool-client-construct.ts`**
+
+- **What**: Reusable construct for creating User Pool Clients
+- **Why**: Represents the frontend application connecting to User Pool
+- **Configuration**:
+  - Auth flows: USER_PASSWORD_AUTH and USER_SRP_AUTH
+  - No client secret (public client for JavaScript)
+  - Token validity: 1 hour for ID/Access, 30 days for Refresh
+  - Prevent user existence errors (security)
+  - Enable token revocation
+- **Learning**: Public clients (web/mobile) don't use secrets; confidential clients (backend) do
+
+##### **4. Created Identity Pool Construct**
+
+**File Created: `infra/lib/constructs/identity-pool-construct.ts`**
+
+- **What**: Reusable construct for creating Cognito Identity Pools
+- **Why**: Provides temporary AWS credentials via STS
+- **Configuration**:
+  - Unauthenticated access disabled
+  - Links to User Pool and Client
+  - Uses L1 construct (CfnIdentityPool) as L2 doesn't exist
+- **EXAM TIP**: Identity Pools are critical for giving authenticated users AWS service access
+
+##### **5. Created IAM Roles Construct**
+
+**File Created: `infra/lib/constructs/cognito-iam-roles-construct.ts`**
+
+- **What**: Creates IAM role for authenticated users
+- **Why**: Defines what authenticated users can do in AWS
+- **Configuration**:
+  - Trust policy: Only cognito-identity.amazonaws.com can assume
+  - Condition: Only authenticated users from specific Identity Pool
+  - Permissions: Get credentials, basic CloudWatch logs
+  - Role attachment to Identity Pool
+- **EXAM TIP**: Understanding IAM role assumption with Cognito is heavily tested
+
+##### **6. Created Auth Stack**
+
+**File Created: `infra/lib/stacks/auth-stack.ts`**
+
+- **What**: Stack that composes all auth constructs together
+- **Why**: Separation of concerns - stack orchestrates, constructs implement
+- **How**:
+  1. Creates User Pool
+  2. Creates User Pool Client
+  3. Creates Identity Pool
+  4. Creates IAM Roles and attaches to Identity Pool
+  5. Applies tags
+  6. Creates CloudFormation outputs
+- **Outputs Created**:
+  - UserPoolId (for frontend config)
+  - UserPoolClientId (for frontend config)
+  - IdentityPoolId (for frontend config)
+  - Region (for frontend config)
+  - UserPoolArn (for reference)
+  - AuthenticatedRoleArn (for reference)
+
+##### **7. Updated App Entry Point**
+
+**File Updated: `infra/bin/infra.ts`**
+
+- **What**: Added auth stack to CDK app
+- **Why**: Register stack for deployment
+- **Stack naming**: `TaskApproval-Auth-Dev`
+
+##### **8. Deployed Infrastructure**
+
+**Commands:**
+```bash
+cd infra
+pnpm build
+cdk diff TaskApproval-Auth-Dev
+cdk deploy TaskApproval-Auth-Dev
+cdk outputs --stack TaskApproval-Auth-Dev
+```
+
+**Deployment time**: ~2-3 minutes (much faster than CloudFront)
+
+**Resources created**:
+- 1 Cognito User Pool
+- 1 User Pool Client
+- 1 Identity Pool
+- 1 IAM Role
+- 1 Identity Pool Role Attachment
+
+#### **Part 2: Frontend Integration**
+
+##### **9. Installed Dependencies**
+
+**Commands:**
+```bash
+cd frontend
+pnpm add aws-amplify
+pnpm add react-router-dom
+pnpm add -D @types/react-router-dom
+```
+
+**Libraries**:
+- `aws-amplify` - AWS SDK for frontend (Cognito, API Gateway, etc.)
+- `react-router-dom` - Client-side routing for React
+
+##### **10. Created AWS Configuration**
+
+**File Created: `frontend/src/config/aws-config.ts`**
+
+- **What**: Configures AWS Amplify with Cognito details
+- **Why**: Tells Amplify how to connect to our User Pool and Identity Pool
+- **Configuration**:
+  - User Pool ID (from CDK output)
+  - User Pool Client ID (from CDK output)
+  - Identity Pool ID (from CDK output)
+  - Region (from CDK output)
+  - Sign-in method: email
+  - Verification method: code
+  - Password policy (matches backend)
+- **Important**: Replaced placeholder values with actual CDK outputs
+
+##### **11. Created Auth Context Provider**
+
+**File Created: `frontend/src/contexts/AuthContext.tsx`**
+
+- **What**: React Context for managing authentication state globally
+- **Why**: Makes auth state and methods available throughout the app
+- **Provides**:
+  - `user` - Current authenticated user
+  - `loading` - Loading state during auth operations
+  - `error` - Error messages
+  - `signUpUser()` - Register new user
+  - `confirmSignUpUser()` - Verify email with code
+  - `signInUser()` - Login existing user
+  - `signOutUser()` - Logout current user
+  - `resendConfirmationCode()` - Resend verification email
+  - `isAuthenticated` - Boolean flag for auth status
+- **Learning**: React Context API for global state management
+
+##### **12. Created Sign Up Component**
+
+**File Created: `frontend/src/components/Auth/SignUp.tsx`**
+
+- **What**: User registration form
+- **Features**:
+  - Email and password input fields
+  - Confirm password validation
+  - Password strength validation (matches Cognito policy)
+  - Email format validation
+  - Loading state during submission
+  - Error message display
+  - Link to Sign In page
+  - Redirect to verification page on success
+- **Validation**:
+  - All fields required
+  - Valid email format
+  - Password min 8 characters
+  - Password with uppercase, lowercase, number
+  - Passwords must match
+
+##### **13. Created Confirm Sign Up Component**
+
+**File Created: `frontend/src/components/Auth/ConfirmSignUp.tsx`**
+
+- **What**: Email verification form with code input
+- **Features**:
+  - Email input (pre-filled from sign up)
+  - 6-digit verification code input
+  - Resend code functionality
+  - Success message display
+  - Redirect to sign in after verification
+  - Link back to sign in page
+- **Flow**: User receives email → enters code → verified → redirected to sign in
+
+##### **14. Created Sign In Component**
+
+**File Created: `frontend/src/components/Auth/SignIn.tsx`**
+
+- **What**: User login form
+- **Features**:
+  - Email and password input fields
+  - Loading state during sign in
+  - Error message display with specific messages
+  - Link to Sign Up page
+  - Redirect to dashboard on success
+  - Auto-redirect to verification if email not confirmed
+- **Error Handling**:
+  - UserNotConfirmedException → Redirect to verification
+  - NotAuthorizedException → Wrong password
+  - UserNotFoundException → User doesn't exist
+
+##### **15. Created Protected Route Component**
+
+**File Created: `frontend/src/components/Auth/ProtectedRoute.tsx`**
+
+- **What**: Route guard wrapper component
+- **Why**: Ensures only authenticated users can access certain pages
+- **Logic**:
+  - Show loading spinner while checking auth
+  - Redirect to sign in if not authenticated
+  - Render children if authenticated
+- **Usage**: Wraps protected pages like Dashboard
+
+##### **16. Created Dashboard Component**
+
+**File Created: `frontend/src/pages/Dashboard.tsx`**
+
+- **What**: Main page after successful login
+- **Features**:
+  - Welcome message with user email
+  - Sign Out button
+  - User information display
+  - Authentication success confirmation
+  - Next steps information
+  - JWT token viewer (development tool)
+- **Purpose**: Placeholder for future task management features (Phase 3)
+
+##### **17. Updated App Component**
+
+**File Updated: `frontend/src/App.tsx`**
+
+- **What**: Main app component with routing
+- **Changes**:
+  - Imported AWS config (initializes Amplify)
+  - Wrapped app in AuthProvider
+  - Set up React Router
+  - Defined routes (public and protected)
+- **Routes**:
+  - `/signup` - Public (Sign up page)
+  - `/signin` - Public (Sign in page)
+  - `/confirm-signup` - Public (Verification page)
+  - `/dashboard` - Protected (Dashboard)
+  - `/` - Redirects to dashboard
+
+##### **18. Built and Deployed Frontend**
+
+**Commands:**
+```bash
+cd frontend
+pnpm build
+
+cd ../infra
+cdk deploy TaskApproval-Frontend-Dev
+```
+
+**What happens**:
+1. Frontend builds with new auth code
+2. CDK uploads new build to S3
+3. CloudFront cache invalidated
+4. New version available after 2-5 minutes
+
+### **Key Concepts Learned**
+
+#### **1. Cognito User Pools vs Identity Pools**
+
+**User Pool (Authentication)**:
+- User directory service
+- Handles sign up, sign in, password reset
+- Issues JWT tokens after authentication
+- Like an identity provider (IDP)
+
+**Identity Pool (Authorization)**:
+- Provides temporary AWS credentials
+- Uses STS (Security Token Service)
+- Links authenticated users to IAM roles
+- Allows access to AWS services (S3, DynamoDB, etc.)
+
+**Relationship**: User Pool authenticates → Identity Pool authorizes
+
+**EXAM TIP**: This distinction is CRITICAL for AWS Developer Associate exam
+
+#### **2. JWT Tokens**
+
+**Three Types**:
+
+1. **ID Token**:
+   - Contains user identity information (email, username, etc.)
+   - Used to get user profile
+   - Short-lived (1 hour in our config)
+
+2. **Access Token**:
+   - Used to access resources (API Gateway, etc.)
+   - Contains scopes and groups
+   - Short-lived (1 hour in our config)
+
+3. **Refresh Token**:
+   - Used to get new ID and Access tokens
+   - Long-lived (30 days in our config)
+   - Cannot be used directly for authentication
+
+**Storage**: Amplify automatically stores tokens in localStorage
+
+**EXAM TIP**: Know what each token is used for and their typical lifetimes
+
+#### **3. Authentication Flow**
+
+**Sign Up Flow**:
+1. User enters email and password
+2. Frontend calls `signUp()` with user details
+3. Cognito creates user in UNCONFIRMED state
+4. Cognito sends verification email with code
+5. User enters code from email
+6. Frontend calls `confirmSignUp()` with code
+7. Cognito changes user to CONFIRMED state
+8. User can now sign in
+
+**Sign In Flow**:
+1. User enters email and password
+2. Frontend calls `signIn()` with credentials
+3. Cognito validates credentials
+4. If valid, Cognito returns JWT tokens
+5. Amplify stores tokens in localStorage
+6. User is authenticated and redirected to dashboard
+
+**Sign Out Flow**:
+1. User clicks sign out
+2. Frontend calls `signOut()`
+3. Amplify clears tokens from localStorage
+4. User is unauthenticated and redirected to sign in
+
+#### **4. IAM Role Assumption with Cognito**
+
+**Trust Policy**:
+- Defines WHO can assume the role
+- In our case: `cognito-identity.amazonaws.com` service
+- With condition: Only authenticated users from our Identity Pool
+
+**Permission Policy**:
+- Defines WHAT the role can do
+- Currently: Get credentials, write logs
+- Will add more permissions in later phases
+
+**Assumption Process**:
+1. User authenticates with User Pool → gets JWT tokens
+2. Frontend exchanges JWT for temporary AWS credentials via Identity Pool
+3. Identity Pool assumes the IAM role we defined
+4. Temporary credentials returned (access key, secret key, session token)
+5. Valid for 1 hour (default)
+6. Can now access AWS services directly
+
+**EXAM TIP**: Understanding STS AssumeRoleWithWebIdentity is important
+
+#### **5. Public vs Confidential Clients**
+
+**Public Clients** (Our case):
+- JavaScript/mobile apps running on user devices
+- Cannot securely store secrets
+- `generateSecret: false` in User Pool Client
+- Use SRP or USER_PASSWORD_AUTH flows
+
+**Confidential Clients**:
+- Backend servers
+- Can securely store secrets
+- `generateSecret: true`
+- Use client credentials with secret
+
+**Security Implication**: Public clients rely on other security measures (CORS, token expiry)
+
+#### **6. Password Policies**
+
+**Dev Environment** (Easier testing):
+- Min 8 characters
+- Uppercase, lowercase, number required
+- Special characters NOT required
+
+**Prod Environment** (Stronger security):
+- Min 12 characters
+- Uppercase, lowercase, number, special characters required
+
+**Why Different**: Balance between security and development convenience
+
+#### **7. React Context API**
+
+**Purpose**: Share state across components without prop drilling
+
+**Pattern**:
+1. Create context with `createContext()`
+2. Create provider component that wraps app
+3. Use `useState` and `useEffect` in provider
+4. Create custom hook (`useAuth`) for easy access
+5. Components access context via hook
+
+**Benefits**: Clean code, easy testing, centralized logic
+
+#### **8. Protected Routes Pattern**
+
+**Pattern**:
+1. Check if user is authenticated
+2. If loading, show spinner
+3. If not authenticated, redirect to sign in
+4. If authenticated, render children
+
+**Security Note**: This is client-side protection only. Backend API must also validate tokens (Phase 3).
+
+### **Architecture Diagram**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    User Browser                         │
+│                                                          │
+│  ┌────────────────────────────────────────────────┐    │
+│  │         React App (Amplify)                    │    │
+│  │  - Sign Up / Sign In / Sign Out                │    │
+│  │  - AuthContext (state management)              │    │
+│  │  - Protected Routes                            │    │
+│  └───────────────────┬────────────────────────────┘    │
+│                      │                                   │
+└──────────────────────┼───────────────────────────────────┘
+                       │
+                       ↓ (Authentication)
+         ┌─────────────────────────────┐
+         │   Cognito User Pool         │
+         │   - User Directory          │
+         │   - Password Policies       │
+         │   - Email Verification      │
+         └──────────┬──────────────────┘
+                    │
+                    ↓ (Issues JWT Tokens)
+                    │
+         ┌──────────┴──────────────────┐
+         │                              │
+         ↓                              ↓
+┌─────────────────┐          ┌─────────────────────┐
+│   ID Token      │          │   Access Token      │
+│   (User Info)   │          │   (API Access)      │
+└─────────────────┘          └─────────────────────┘
+         │                              │
+         └──────────┬───────────────────┘
+                    │
+                    ↓ (Exchange for AWS Credentials)
+         ┌─────────────────────────────┐
+         │   Cognito Identity Pool     │
+         │   - Temporary Credentials   │
+         │   - STS AssumeRole          │
+         └──────────┬──────────────────┘
+                    │
+                    ↓ (Assumes IAM Role)
+         ┌─────────────────────────────┐
+         │   IAM Role                  │
+         │   - Get Credentials         │
+         │   - CloudWatch Logs         │
+         │   - (More in Phase 3+)      │
+         └─────────────────────────────┘
+```
 
 ### **Verification Steps**
 
-_To be completed_
+#### **✅ Infrastructure Verification**
+
+**1. Verify Cognito Resources Created**
+
+```bash
+# List User Pools
+aws cognito-idp list-user-pools --max-results 10
+
+# Expected: See TaskApproval-UserPool-Dev
+
+# List Identity Pools
+aws cognito-identity list-identity-pools --max-results 10
+
+# Expected: See TaskApproval_IdentityPool_Dev
+```
+
+**2. Verify User Pool Configuration**
+
+```bash
+# Describe User Pool (replace with actual ID from outputs)
+aws cognito-idp describe-user-pool --user-pool-id us-east-1_xxxxxxxxx
+```
+
+**Check**:
+- SignIn aliases: email enabled
+- Auto-verified attributes: email
+- MFA: OFF
+- Password policy matches config
+
+**3. Verify IAM Role Created**
+
+```bash
+# List IAM roles (filter for TaskApproval)
+aws iam list-roles | grep TaskApproval
+```
+
+**Expected**: See authenticated role created
+
+**4. Verify CloudFormation Stack**
+
+```bash
+# Describe auth stack
+aws cloudformation describe-stacks --stack-name TaskApproval-Auth-Dev
+```
+
+**Expected**: Stack status CREATE_COMPLETE
+
+**5. Get CDK Outputs**
+
+```bash
+cd infra
+cdk outputs --stack TaskApproval-Auth-Dev
+```
+
+**Expected Outputs**:
+- UserPoolId: `us-east-1_xxxxxxxxx`
+- UserPoolClientId: `xxxxxxxxxxxxxxxxxxxx`
+- IdentityPoolId: `us-east-1:xxxx-xxxx-xxxx`
+- Region: `us-east-1`
+
+#### **✅ Frontend Verification**
+
+**1. Test Sign Up Flow**
+
+Steps:
+1. Open CloudFront URL in browser
+2. Navigate to `/signup`
+3. Enter test email and password
+4. Click "Sign Up"
+5. **Expected**: Redirected to verification page
+6. Check email for verification code
+7. Enter 6-digit code
+8. Click "Verify Email"
+9. **Expected**: "Email verified successfully!" message
+10. **Expected**: Redirected to sign in page
+
+**Common Issues**:
+- Email not received → Check spam folder
+- Invalid code → Check expiry (codes expire after 24 hours)
+- Code already used → Request new code with "Resend"
+
+**2. Test Sign In Flow**
+
+Steps:
+1. On sign in page
+2. Enter verified email and password
+3. Click "Sign In"
+4. **Expected**: Redirected to dashboard
+5. **Expected**: Welcome message with your email
+6. **Expected**: User ID displayed
+
+**Common Errors**:
+- "User not confirmed" → Email not verified, redirect to verification
+- "Incorrect email or password" → Wrong credentials
+- "User not found" → User doesn't exist, sign up first
+
+**3. Test Protected Route**
+
+Steps:
+1. While signed in, note the dashboard URL
+2. Click "Sign Out"
+3. **Expected**: Redirected to sign in page
+4. Manually navigate to `/dashboard` in URL bar
+5. **Expected**: Automatically redirected back to `/signin`
+6. Sign in again
+7. **Expected**: Access to dashboard granted
+
+**What this tests**: Route protection is working correctly
+
+**4. Verify JWT Tokens**
+
+Steps:
+1. Sign in successfully
+2. Press F12 to open DevTools
+3. Go to **Application** tab
+4. Click **Local Storage** in sidebar
+5. Click on your CloudFront domain
+6. **Expected**: See multiple entries starting with `CognitoIdentityServiceProvider`
+7. Look for keys containing:
+   - `idToken` - ID token
+   - `accessToken` - Access token
+   - `refreshToken` - Refresh token
+
+**Alternative Method**:
+1. On dashboard, click "View Tokens in Console" button
+2. Check browser console
+3. **Expected**: Object with all Cognito tokens logged
+
+**Decode Token**:
+1. Copy ID token value
+2. Go to https://jwt.io
+3. Paste token in "Encoded" section
+4. **Expected**: See decoded payload with:
+   - `sub` - User ID
+   - `email` - User email
+   - `cognito:username` - Username
+   - `iat` - Issued at timestamp
+   - `exp` - Expiry timestamp
+
+**5. Verify User in Cognito Console**
+
+Steps:
+1. Go to [AWS Cognito Console](https://console.aws.amazon.com/cognito/)
+2. Click on "User pools"
+3. Find and click your User Pool (TaskApproval-UserPool-Dev)
+4. Click "Users" tab
+5. **Expected**: See your test user listed
+6. **Expected**: Status = "CONFIRMED"
+7. Click on username
+8. **Expected**: See user attributes (email, etc.)
+9. **Expected**: See "Enabled" status
+
+**6. Test Sign Out Flow**
+
+Steps:
+1. While signed in to dashboard
+2. Click "Sign Out" button
+3. **Expected**: Redirected to sign in page
+4. Press F12 → Application → Local Storage
+5. **Expected**: Cognito tokens removed from storage
+6. Try to access `/dashboard` manually
+7. **Expected**: Redirected to sign in (not authenticated)
+
+**7. Test Multiple Users**
+
+Steps:
+1. Sign up with second email address
+2. Verify second user
+3. Check Cognito Console
+4. **Expected**: Two users in User Pool
+5. Sign in with first user
+6. Sign out
+7. Sign in with second user
+8. **Expected**: Dashboard shows second user's email
+
+#### **✅ AWS Console Verification**
+
+**Cognito User Pool Console**:
+- User count shows registered users
+- Email verification settings correct
+- Password policy matches config
+- Self sign-up enabled
+
+**IAM Console**:
+- Authenticated role exists
+- Trust policy allows cognito-identity
+- Permission policy has basic permissions
+
+**CloudWatch Logs**:
+- May see Cognito-related log groups
+- Can check for authentication events
+
+### **Testing Results Summary**
+
+✅ **Infrastructure**:
+- User Pool created successfully
+- User Pool Client created
+- Identity Pool created
+- IAM Role created and attached
+- All CloudFormation outputs available
+
+✅ **Authentication Flows**:
+- Sign up working
+- Email verification working
+- Sign in working
+- Sign out working
+- Protected routes working
+
+✅ **JWT Tokens**:
+- Tokens issued correctly
+- Stored in localStorage
+- Decoded successfully
+- Contain correct user information
+
+✅ **User Management**:
+- Users visible in Cognito Console
+- User status correct (CONFIRMED)
+- Multiple users supported
+
+### **Common Issues and Solutions**
+
+**Issue: "User pool client does not exist"**
+- **Cause**: Frontend config not updated with real values
+- **Solution**: 
+  1. Run `cd infra && cdk outputs --stack TaskApproval-Auth-Dev`
+  2. Copy actual values to `frontend/src/config/aws-config.ts`
+  3. Rebuild frontend: `cd frontend && pnpm build`
+  4. Redeploy: `cd infra && cdk deploy TaskApproval-Frontend-Dev`
+
+**Issue: Email not received**
+- **Cause**: Cognito default email sender limitations
+- **Solution**:
+  1. Check spam folder
+  2. Wait a few minutes (can be delayed)
+  3. Use "Resend Code" button
+  4. For production: Configure SES (Simple Email Service)
+
+**Issue: "User already exists" when signing up**
+- **Cause**: Email already registered
+- **Solution**:
+  1. Use different email
+  2. Or delete user from Cognito Console
+  3. Or sign in with existing credentials
+
+**Issue: Password doesn't meet requirements**
+- **Cause**: Password policy not met
+- **Solution**:
+  - Dev: Min 8 chars, uppercase, lowercase, number
+  - Prod: Min 12 chars, uppercase, lowercase, number, special char
+  - Example dev password: `TestPass123`
+  - Example prod password: `TestPass123!@#`
+
+**Issue: "User is not confirmed"**
+- **Cause**: Email not verified
+- **Solution**:
+  1. Go to `/confirm-signup`
+  2. Enter email and verification code
+  3. If no code, click "Resend Code"
+  4. Or verify in Cognito Console (admin action)
+
+**Issue: Can still access dashboard after sign out**
+- **Cause**: Browser cache or context not updating
+- **Solution**:
+  1. Hard refresh (Ctrl+Shift+R)
+  2. Clear local storage
+  3. Check AuthContext is wrapping entire app
+
+**Issue: Blank page after deployment**
+- **Cause**: Build errors or CloudFront cache
+- **Solution**:
+  1. Check browser console for errors
+  2. Wait 2-5 minutes for CloudFront invalidation
+  3. Hard refresh browser
+  4. Verify build completed: `cd frontend && ls dist/`
+
+**Issue: TypeScript errors during build**
+- **Cause**: Missing dependencies or type definitions
+- **Solution**:
+  1. Run `cd frontend && pnpm install`
+  2. Check all imports are correct
+  3. Ensure `aws-amplify` and `react-router-dom` installed
+  4. Run `pnpm build` to check for errors
+
+### **Cost Analysis**
+
+✅ **Phase 2 is 100% FREE TIER eligible**
+
+**Cognito User Pool**:
+- **Free Tier**: 50,000 MAU (Monthly Active Users)
+- **Our Usage**: 1-5 test users
+- **Cost**: $0.00
+
+**Cognito Identity Pool**:
+- **Free Tier**: Unlimited
+- **Cost**: $0.00
+
+**IAM Roles**:
+- **Free Tier**: Unlimited
+- **Cost**: $0.00
+
+**Email Delivery**:
+- **Free Tier**: Cognito default email (limited to 1 email per second)
+- **Cost**: $0.00
+- **Note**: For production volume, use SES (also has free tier)
+
+**CloudWatch Logs** (from IAM role permissions):
+- **Free Tier**: 5GB storage, 10 custom metrics
+- **Our Usage**: Minimal logs
+- **Cost**: $0.00
+
+**JWT Token Storage**:
+- **Location**: Browser localStorage
+- **Cost**: $0.00 (client-side only)
+
+**Total Phase 2 Cost**: **$0.00**
+
+**Cumulative Cost (Phases 0-2)**: **$0.00**
+
+### **Security Best Practices Implemented**
+
+1. **Private by Default**:
+   - User Pool not publicly accessible
+   - Email verification required
+   - No anonymous access to Identity Pool
+
+2. **Password Policies**:
+   - Minimum length enforced
+   - Complexity requirements (uppercase, lowercase, numbers)
+   - Different policies for dev vs prod
+
+3. **Token Management**:
+   - Short-lived access tokens (1 hour)
+   - Refresh tokens for seamless experience
+   - Tokens revocable
+
+4. **Error Messages**:
+   - "Prevent user existence errors" enabled
+   - Generic error messages don't reveal if user exists
+   - Prevents email enumeration attacks
+
+5. **IAM Least Privilege**:
+   - Role has minimal permissions
+   - Only what's needed for current phase
+   - Will expand in later phases
+
+6. **Protected Routes**:
+   - Client-side route protection
+   - Server-side validation in Phase 3 (API Gateway)
+
+7. **HTTPS Only**:
+   - CloudFront enforces HTTPS
+   - Tokens transmitted securely
+
+### **Benefits Achieved**
+
+1. ✅ **User Authentication**: Users can sign up and sign in
+2. ✅ **Email Verification**: Email ownership confirmed
+3. ✅ **Secure Token Storage**: JWT tokens managed by Amplify
+4. ✅ **Protected Routes**: Dashboard only for authenticated users
+5. ✅ **User Management**: Users visible in Cognito Console
+6. ✅ **AWS Credentials**: Foundation for accessing AWS services (Phase 3+)
+7. ✅ **Industry Standard**: Using AWS Cognito (used by many companies)
+8. ✅ **Scalable**: Can handle 50,000 users on free tier
+9. ✅ **Type Safe**: TypeScript for all code
+10. ✅ **Reusable**: Constructs can be used in future projects
+
+### **What's Next: Phase 3 Preview**
+
+With authentication complete, we can now build:
+
+**Phase 3: REST API + Lambda + DynamoDB**
+- Create API Gateway with Cognito authorizer
+- Build Lambda functions for CRUD operations
+- Store tasks in DynamoDB
+- Connect frontend to backend API
+- Only authenticated users can access API
+
+**Why Phase 2 Matters**:
+- API Gateway will validate JWT tokens from Cognito
+- Lambda functions will receive user identity
+- DynamoDB will store data per user
+- IAM role will allow users to call API
+
+### **Cleanup for Phase 2**
+
+**To destroy auth resources**:
+```bash
+cd infra
+cdk destroy TaskApproval-Auth-Dev
+```
+
+**What gets deleted**:
+- Cognito User Pool (and all users)
+- User Pool Client
+- Identity Pool
+- IAM Role
+- CloudFormation stack
+
+**Note**: Keep resources for Phase 3 as API Gateway will need Cognito authorizer
+
+**Verify cleanup**:
+```bash
+aws cognito-idp list-user-pools --max-results 10
+aws cognito-identity list-identity-pools --max-results 10
+aws iam list-roles | grep TaskApproval
+```
+
+**Expected**: No Phase 2 resources should appear
+
+---
 
 ---
 
